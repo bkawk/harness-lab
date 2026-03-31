@@ -122,7 +122,7 @@ def _heuristic_execution_fields(
     }
 
 
-def _llm_execution_prompt(candidate_id: str, proposal: dict, diagnosis: dict, bootstrap_snapshot: dict, heuristic_fields: dict) -> str:
+def _llm_execution_prompt(candidate_id: str, proposal: dict, diagnosis: dict, bootstrap_snapshot: dict, heuristic_fields: dict, decision_bundle: dict) -> str:
     payload = {
         "candidate_id": candidate_id,
         "proposal": {
@@ -138,6 +138,7 @@ def _llm_execution_prompt(candidate_id: str, proposal: dict, diagnosis: dict, bo
             "counterfactuals": diagnosis.get("counterfactuals", [])[:5],
         },
         "bootstrap_snapshot": bootstrap_snapshot,
+        "decision_bundle": decision_bundle,
         "heuristic_fallback": heuristic_fields,
     }
     return (
@@ -198,11 +199,15 @@ def plan_execution_for_candidate(candidates_dir: Path, candidate_id: str) -> Exe
     if str(os.environ.get("HARNESS_LAB_LLM_EXECUTION_ENABLED", "")).strip().lower() in {"1", "true", "yes"}:
         candidate_dir = candidates_dir / candidate_id
         bootstrap_snapshot = {}
+        decision_bundle = {}
         bootstrap_path = candidate_dir / "memory" / "bootstrap_snapshot.json"
         if bootstrap_path.exists():
             bootstrap_snapshot = read_json(bootstrap_path)
+        decision_bundle_path = candidate_dir / "memory" / "decision_bundle.json"
+        if decision_bundle_path.exists():
+            decision_bundle = read_json(decision_bundle_path)
         payload = run_claude_json(
-            _llm_execution_prompt(candidate_id, proposal, diagnosis, bootstrap_snapshot, heuristic_fields),
+            _llm_execution_prompt(candidate_id, proposal, diagnosis, bootstrap_snapshot, heuristic_fields, decision_bundle),
             cwd=candidate_dir,
         )
         normalized = _normalize_llm_execution_payload(payload or {}, heuristic_fields)

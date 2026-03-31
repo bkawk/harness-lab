@@ -21,6 +21,7 @@ artifacts/candidates/<candidate_id>/
     summary.json
   memory/
     bootstrap_snapshot.json
+    decision_bundle.json
 ```
 
 ## Purpose Of Each Directory
@@ -47,6 +48,7 @@ artifacts/candidates/<candidate_id>/
 - `memory/`
   - links or exports from cross-run synthesis and prior evidence
   - includes `bootstrap_snapshot.json`, a compact scientific situation report for the candidate
+  - includes `decision_bundle.json`, a richer per-cycle context bundle with scored, pending, stalled, and lineage-focused candidate context
 
 ## Minimal Files
 

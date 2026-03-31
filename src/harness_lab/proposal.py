@@ -8,7 +8,7 @@ from pathlib import Path
 
 log = logging.getLogger("harness_lab.proposal")
 
-from harness_lab.bootstrap import write_bootstrap_snapshot
+from harness_lab.bootstrap import write_bootstrap_snapshot, write_decision_bundle
 from harness_lab.budget import read_budget
 from harness_lab.datasets import choose_best_prepared_dataset, get_dataset_record
 from harness_lab.diversity import read_diversity
@@ -405,6 +405,7 @@ def _branching_mode_change_items(branching_mode: str, chosen_mechanism: str, lat
 def _llm_proposal_prompt(
     *,
     bootstrap_snapshot: dict,
+    decision_bundle: dict,
     parent_diagnosis: dict,
     parent_summary: dict,
     branching_mode: str,
@@ -414,6 +415,7 @@ def _llm_proposal_prompt(
 ) -> str:
     payload = {
         "bootstrap_snapshot": bootstrap_snapshot,
+        "decision_bundle": decision_bundle,
         "parent_diagnosis": {
             "summary": parent_diagnosis.get("summary", ""),
             "mechanism": parent_diagnosis.get("mechanism", ""),
@@ -483,6 +485,7 @@ def _maybe_llm_author_proposal(
     *,
     candidate_root: Path,
     bootstrap_snapshot: dict,
+    decision_bundle: dict,
     parent_diagnosis: dict,
     parent_summary: dict,
     branching_mode: str,
@@ -495,6 +498,7 @@ def _maybe_llm_author_proposal(
     payload = run_claude_json(
         _llm_proposal_prompt(
             bootstrap_snapshot=bootstrap_snapshot,
+            decision_bundle=decision_bundle,
             parent_diagnosis=parent_diagnosis,
             parent_summary=parent_summary,
             branching_mode=branching_mode,
@@ -534,6 +538,14 @@ def draft_proposal_for_candidate(
     candidate_root = _candidate_root(candidates_dir, candidate_id)
     if not candidate_root.exists():
         create_candidate_workspace(candidates_dir, candidate_id, chosen_parent)
+    decision_bundle_path = write_decision_bundle(
+        candidates_dir,
+        memory_dir,
+        candidate_id,
+        parent_id=chosen_parent,
+        dataset_id=dataset_id,
+        synthesis=synthesis,
+    )
     bootstrap_path = write_bootstrap_snapshot(
         candidates_dir,
         memory_dir,
@@ -543,6 +555,7 @@ def draft_proposal_for_candidate(
         synthesis=synthesis,
     )
     bootstrap_snapshot = read_json(bootstrap_path)
+    decision_bundle = read_json(decision_bundle_path)
 
     if chosen_parent is None:
         mechanism = "initial_harness"
@@ -576,6 +589,7 @@ def draft_proposal_for_candidate(
             parent_diagnosis={},
             parent_summary={},
             branching_mode="genesis",
+            decision_bundle=decision_bundle,
             fallback_target=target,
             fallback_changes=changes,
             fallback_rationale=rationale,
@@ -601,6 +615,7 @@ def draft_proposal_for_candidate(
                 "diversity_context": diversity,
                 "external_review_context": external_review,
                 "bootstrap_snapshot_path": str(bootstrap_path.relative_to(candidate_root)),
+                "decision_bundle_path": str(decision_bundle_path.relative_to(candidate_root)),
                 "branching_mode": "genesis",
             },
         )
@@ -650,6 +665,7 @@ def draft_proposal_for_candidate(
         parent_diagnosis=parent_diagnosis,
         parent_summary=parent_summary,
         branching_mode=branching_mode,
+        decision_bundle=decision_bundle,
         fallback_target=target,
         fallback_changes=changes,
         fallback_rationale=rationale,
@@ -688,6 +704,7 @@ def draft_proposal_for_candidate(
             },
             "dataset_context": dataset_record or ({"dataset_id": dataset_id, "status": "missing"} if dataset_id else {}),
             "bootstrap_snapshot_path": str(bootstrap_path.relative_to(candidate_root)),
+            "decision_bundle_path": str(decision_bundle_path.relative_to(candidate_root)),
             "branching_mode": branching_mode,
             "parent_selection": synthesis.get("ranked_parents", [])[:3],
         },

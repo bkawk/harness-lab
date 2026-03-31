@@ -11,6 +11,7 @@ This repo is meant to feel alive:
 - every workspace now captures harness source provenance and raw runner traces
 - the lab can draft follow-ups from prior evidence
 - every candidate can begin with a bootstrap snapshot of the current scientific situation
+- every candidate can carry a richer decision bundle that separates scored, pending, and stalled lines before Claude makes bounded choices
 - the lab can notice the machine it is running on and adapt its assumptions
 - the lab can look back over its own evolutions and write explicit hindsight
 - the lab can let hindsight change what it tries next
