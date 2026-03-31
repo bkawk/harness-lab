@@ -47,6 +47,10 @@ def _deterministic_index(text: str, modulo: int) -> int:
     return total % modulo if modulo > 0 else 0
 
 
+def deterministic_index(text: str, modulo: int) -> int:
+    return _deterministic_index(text, modulo)
+
+
 def derive_config(candidate_id: str, proposal: dict, diagnosis: dict) -> ScienceConfig:
     signature = f"{candidate_id}|{_proposal_signature(proposal)}|{diagnosis.get('summary', '')}"
     lr_choices = [2.0e-4, 3.0e-4, 4.0e-4]

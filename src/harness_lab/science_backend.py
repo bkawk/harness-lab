@@ -6,7 +6,7 @@ from pathlib import Path
 
 import torch
 
-from harness_lab.science_config import ScienceConfig, apply_oom_backoff, derive_config
+from harness_lab.science_config import ScienceConfig, apply_oom_backoff, derive_config, deterministic_index
 from harness_lab.science_data import (
     PackedShardDataset,
     evaluate_model,
@@ -40,7 +40,7 @@ def run_science_backend(
     diagnosis: dict,
     trace_dir: Path,
 ) -> ScienceRunResult:
-    torch.manual_seed(1337 + _deterministic_index(candidate_id, 1000))
+    torch.manual_seed(1337 + deterministic_index(candidate_id, 1000))
     if hasattr(torch, "set_float32_matmul_precision"):
         torch.set_float32_matmul_precision("high")
 
