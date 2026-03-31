@@ -200,6 +200,7 @@ def build_human_feedback(memory_dir: Path) -> dict:
     stale_process_count = top_failures.get("stale_process", 0)
     startup_issue_count = top_failures.get("startup_timeout", 0)
     no_progress_count = top_failures.get("no_progress_timeout", 0)
+    oom_count = top_failures.get("cuda_oom", 0) + top_failures.get("oom", 0) + top_failures.get("vram_pressure", 0)
     if stale_process_count >= 1 or startup_issue_count >= 1 or no_progress_count >= 1:
         response = response_by_kind.get("ops")
         total_ops_failures = stale_process_count + startup_issue_count + no_progress_count
@@ -227,6 +228,19 @@ def build_human_feedback(memory_dir: Path) -> dict:
                 "confidence": 0.84 if persistence else 0.72,
                 "source": "hindsight",
                 "response": response or {},
+            }
+        )
+
+    if oom_count >= 1:
+        items.append(
+            {
+                "kind": "vram",
+                "summary": "Increase effective VRAM headroom or reduce memory pressure so science candidates can finish without OOM-driven degradation.",
+                "why_now": f"The lab has already seen {oom_count} memory-pressure failure(s), and the backend is now explicitly surfacing VRAM limits.",
+                "evidence": ["artifacts/memory/hindsight.json", "artifacts/candidates/*/traces/science_progress.json"],
+                "priority": _score_item(leverage=5, urgency=5, recurrence=3, cost=4),
+                "confidence": 0.88,
+                "source": "hindsight",
             }
         )
 

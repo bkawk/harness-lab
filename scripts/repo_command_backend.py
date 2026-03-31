@@ -27,6 +27,24 @@ def dataset_context(dataset_path: str) -> tuple[dict, dict]:
     return build_manifest, shards_metadata
 
 
+def dataset_counts(build_manifest: dict, shards_metadata: dict) -> tuple[int, int]:
+    preprocess_ref = build_manifest.get("preprocess_manifest")
+    preprocess_manifest = preprocess_ref if isinstance(preprocess_ref, dict) else {}
+    train_count = int(
+        build_manifest.get("train_count")
+        or preprocess_manifest.get("train_count")
+        or sum(int(entry.get("num_samples", 0) or 0) for entry in (shards_metadata.get("splits", {}) or {}).get("train", []))
+        or 0
+    )
+    val_count = int(
+        build_manifest.get("val_count_actual")
+        or preprocess_manifest.get("val_count")
+        or sum(int(entry.get("num_samples", 0) or 0) for entry in (shards_metadata.get("splits", {}) or {}).get("val", []))
+        or 0
+    )
+    return train_count, val_count
+
+
 def deterministic_seed(candidate_id: str, payload: str) -> int:
     digest = hashlib.sha256(f"{candidate_id}|{payload}".encode("utf-8")).hexdigest()
     return int(digest[:8], 16)
@@ -46,7 +64,7 @@ def write_startup_marker(payload: dict) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
-def fallback_backend() -> None:
+def fallback_backend(error: Exception | None = None) -> None:
     candidate_id = os.environ["HARNESS_LAB_CANDIDATE_ID"]
     result_path = Path(os.environ["HARNESS_LAB_RESULT_PATH"])
     proposal_path = Path(os.environ["HARNESS_LAB_PROPOSAL_PATH"])
@@ -63,8 +81,7 @@ def fallback_backend() -> None:
     mechanism = str(proposal.get("target", {}).get("harness_component", "")).strip() or str(diagnosis.get("mechanism", "")).strip()
     expected_failure = str(proposal.get("target", {}).get("expected_failure_mode", "")).strip()
     change_count = len(proposal.get("changes", []))
-    train_count = int(build_manifest.get("preprocess_manifest", {}).get("train_count", 0) or 0)
-    val_count = int(build_manifest.get("preprocess_manifest", {}).get("val_count", 0) or 0)
+    train_count, val_count = dataset_counts(build_manifest, shards_metadata)
     num_points = int(shards_metadata.get("num_points", 0) or 0)
     has_instance_ids = bool(shards_metadata.get("has_instance_ids", False))
 
@@ -94,17 +111,27 @@ def fallback_backend() -> None:
     benchmark_score = round(0.14 + dataset_scale + point_scale + instance_bonus + mechanism_bonus + noise - change_penalty, 6)
     audit_score = round(max(0.0, benchmark_score - failure_penalty - (((seed // 13) % 50) / 2000.0)), 6)
 
-    if benchmark_score >= 0.28 and audit_score >= 0.24:
+    fallback_failure_modes: list[str] = []
+    if error is not None:
+        error_text = f"{type(error).__name__}: {error}"
+        lowered = error_text.lower()
+        if "outofmemory" in lowered or "cuda out of memory" in lowered:
+            fallback_failure_modes.append("cuda_oom")
+            fallback_failure_modes.append("vram_pressure")
+        else:
+            fallback_failure_modes.append("science_backend_error")
+
+    if benchmark_score >= 0.28 and audit_score >= 0.24 and not fallback_failure_modes:
         outcome_label = "keeper"
         observed_failure_modes: list[str] = []
         audit_summary = "Repo-native fallback backend saw the benchmark gain survive the audit slice."
     elif benchmark_score >= 0.22:
         outcome_label = "audit_blocked"
-        observed_failure_modes = [expected_failure] if expected_failure else ["transfer_regression"]
+        observed_failure_modes = fallback_failure_modes or ([expected_failure] if expected_failure else ["transfer_regression"])
         audit_summary = "Repo-native fallback backend saw a local gain that weakened on the audit slice."
     else:
         outcome_label = "dead_end"
-        observed_failure_modes = [expected_failure] if expected_failure else ["no_gain"]
+        observed_failure_modes = fallback_failure_modes or ([expected_failure] if expected_failure else ["no_gain"])
         audit_summary = "Repo-native fallback backend saw no durable gain from this candidate."
 
     benchmark_summary = (
@@ -175,7 +202,7 @@ def main() -> None:
             raise
         (candidate_dir / "traces").mkdir(parents=True, exist_ok=True)
         (candidate_dir / "traces" / "science_backend_error.log").write_text(f"{type(error).__name__}: {error}\n", encoding="utf-8")
-        fallback_backend()
+        fallback_backend(error)
         return
 
     write_result(

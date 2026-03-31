@@ -26,8 +26,8 @@ from harness_lab.science_data import (
 
 @dataclass(frozen=True)
 class ScienceConfig:
-    batch_size: int = 4
-    eval_batch_size: int = 4
+    batch_size: int = 2
+    eval_batch_size: int = 2
     lr: float = 3e-4
     weight_decay: float = 1e-4
     hidden_dim: int = 128
@@ -398,6 +398,41 @@ def run_science_backend(
     trace_dir.mkdir(parents=True, exist_ok=True)
     write_science_progress(trace_dir, "initializing", candidate_id=candidate_id)
     cfg = derive_config(candidate_id, proposal, diagnosis)
+    metadata = load_metadata(dataset_root)
+    spec = get_dataset_spec(dataset_root)
+    device = get_device()
+    oom_retry = str(os.environ.get("HARNESS_LAB_SCIENCE_OOM_RETRY", "1")).strip().lower() in {"1", "true", "yes"}
+    if device.type == "cuda" and oom_retry:
+        free_bytes, total_bytes = torch.cuda.mem_get_info(device)
+        free_gb = free_bytes / (1024**3)
+        total_gb = total_bytes / (1024**3)
+        if free_gb < 2.0:
+            cfg = ScienceConfig(
+                **{
+                    **asdict(cfg),
+                    "batch_size": 1,
+                    "eval_batch_size": 1,
+                    "hidden_dim": min(cfg.hidden_dim, 96),
+                    "global_dim": min(cfg.global_dim, 128),
+                    "instance_dim": min(cfg.instance_dim, 12),
+                    "k_neighbors": min(cfg.k_neighbors, 6),
+                    "instance_loss_weight": min(cfg.instance_loss_weight, 0.02),
+                }
+            )
+            write_science_progress(
+                trace_dir,
+                "oom_backoff_applied",
+                candidate_id=candidate_id,
+                free_gb=round(free_gb, 3),
+                total_gb=round(total_gb, 3),
+                batch_size=cfg.batch_size,
+                eval_batch_size=cfg.eval_batch_size,
+                hidden_dim=cfg.hidden_dim,
+                global_dim=cfg.global_dim,
+                instance_dim=cfg.instance_dim,
+                k_neighbors=cfg.k_neighbors,
+                instance_loss_weight=cfg.instance_loss_weight,
+            )
     write_science_progress(
         trace_dir,
         "config_ready",
@@ -409,9 +444,6 @@ def run_science_backend(
         global_dim=cfg.global_dim,
         k_neighbors=cfg.k_neighbors,
     )
-    metadata = load_metadata(dataset_root)
-    spec = get_dataset_spec(dataset_root)
-    device = get_device()
     param_scale = torch.tensor(spec.param_scale, dtype=torch.float32, device=device)
     num_classes = len(spec.class_names)
     write_science_progress(

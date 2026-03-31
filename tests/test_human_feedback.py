@@ -137,3 +137,26 @@ def test_human_feedback_reescalates_addressed_ops_when_failures_persist(tmp_path
     ops_item = next(item for item in payload["items"] if item["kind"] == "ops")
     assert ops_item["priority"] >= 9
     assert "persists after" in ops_item["why_now"]
+
+
+def test_human_feedback_adds_vram_request_on_oom_pressure(tmp_path):
+    memory_dir = tmp_path / "memory"
+    memory_dir.mkdir(parents=True, exist_ok=True)
+    write_json(memory_dir / "external_review.json", {"status": "idle", "human_advice": []})
+    write_json(
+        memory_dir / "hindsight.json",
+        {
+            "top_outcomes": [],
+            "top_failure_modes": [{"label": "cuda_oom", "count": 2}],
+            "summary": "",
+            "hindsight_findings": [],
+            "policy_adjustments": [],
+        },
+    )
+    write_json(memory_dir / "policy.json", {"summary": ""})
+    write_json(memory_dir / "science_summary.json", {"leaders": {"best_stable": {"candidate_id": "cand_0009"}}})
+
+    payload = build_human_feedback(memory_dir)
+    vram_item = next(item for item in payload["items"] if item["kind"] == "vram")
+    assert vram_item["priority"] >= 9
+    assert "memory-pressure failure" in vram_item["why_now"]
