@@ -95,6 +95,7 @@ Typical examples:
 - backend startup and progress detection
 - dataset slice quality
 - later: explicit VRAM pressure if the evidence supports it
+- explicit modularization of `initial_harness` when the lab keeps revisiting the same broad backend basin
 
 ## LLM Integration Roadmap
 
@@ -218,6 +219,7 @@ The right order is:
   - fusion block
   - loss recipe
   - outcome classifier
+  - `initial_harness` as explicit evolvable submodules instead of one broad backend object
 
 6. Backend-aware evidence
 - richer fingerprints
@@ -257,6 +259,7 @@ Medium-term success:
 - Tier 2 produces better strategic choices than heuristics alone
 - backend changes become more targeted and interpretable
 - the human-feedback queue becomes narrower and more specific over time
+- `initial_harness` stops dominating search as one opaque basin and becomes a set of explicit evolvable modules
 
 Long-term success:
 
