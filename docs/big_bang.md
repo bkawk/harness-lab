@@ -6,21 +6,30 @@ The GitHub repo is the lab dashboard.
 - status: `running`
 - vital_spark_at: `2026-03-31T10:12:12+00:00`
 - started_at: `2026-03-31T15:07:13+00:00`
-- last_heartbeat: `2026-03-31T15:07:26+00:00`
-- cycles_completed: `3`
+- last_heartbeat: `2026-03-31T15:12:33+00:00`
+- cycles_completed: `1`
 - genesis seed: `cand_0001`
-- last candidate: `cand_0037`
+- last candidate: `cand_0039`
 - last dataset: `abc_boundary512`
-- last commit: `d2e7a85d341dce611b6b5efe67b5e34e2a73bf0c`
-- last publish message: `Published d2e7a85d341dce611b6b5efe67b5e34e2a73bf0c to origin/main.`
+- last commit: `-`
+- last publish message: `Publishing skipped.`
 - last cycle mode: `normal_cycle`
 - novelty cycles triggered: `0`
 
 ## Latest Step
-- no completed big-bang step yet
+- candidate: `cand_0039`
+- dataset: `abc_boundary512` via `reused_prepared_dataset`
+- seed action: `existing`
+- proposal status: `candidate`
+- outcome status: `complete`
+- diagnosis status: `complete`
+- next top parent: `cand_0013`
+- published: `False`
+- commit: `-`
+- cycle mode: `normal_cycle`
 
 ## Active Backend
-- active_candidate: `cand_0039`
+- active_candidate: `-`
 - backend_status: `-`
 - backend_pid: `-`
 - backend_started_at: `-`
@@ -28,11 +37,11 @@ The GitHub repo is the lab dashboard.
 - backend_poll_interval_seconds: `-`
 
 ## Recent Candidates
+- `cand_0039`: outcome `stalled`; diagnosis `complete`; benchmark `None`
+- `cand_0038`: outcome `stalled`; diagnosis `empty`; benchmark `None`
 - `cand_0037`: outcome `stalled`; diagnosis `complete`; benchmark `None`
 - `cand_0036`: outcome `stalled`; diagnosis `complete`; benchmark `None`
 - `cand_0035`: outcome `stalled`; diagnosis `complete`; benchmark `None`
-- `cand_0034`: outcome `stalled`; diagnosis `complete`; benchmark `None`
-- `cand_0033`: outcome `stalled`; diagnosis `complete`; benchmark `None`
 
 ## Science Leaders
 - best benchmark: `cand_0013` -> `0.3847249926656351`
@@ -48,11 +57,13 @@ The GitHub repo is the lab dashboard.
 - no scored candidates yet
 
 ## Hindsight
-- summary: `The lab saw 6 audit-blocked outcomes; it should have emphasized transfer-stability checks earlier.`
-- adjustment: `Raise priority for proposals that directly target transfer stability after an audit_blocked result.`
+- summary: `Across 38 candidates the lab is dominated by stalls (9) and audit blocks (6), with only 1 improved outcome. The last 8 candidates (cand_0032–0039) all stalled, every one carrying the same 6-fingerprint bundle, indicating the search is stuck in a single region of the design space. Startup timeouts (7) are the leading failure mode and account for most early-exit time savings, but they also mean many candidates never produce usable signal. Transfer-related failures (collapse + regression = 5) remain the second-largest cluster and feed directly into the audit-blocked outcomes.`
+- adjustment: `Cap simultaneous fingerprint changes at 2–3 per candidate so stall/failure causes can be isolated.`
+- adjustment: `After 3 consecutive stalls with the same fingerprint set, force the proposer to drop at least 2 of those axes before the next candidate.`
+- adjustment: `Add a transfer-stability pre-check (lightweight probe on a held-out transfer split) before committing to a full run; gate audit submission on passing it.`
 
 ## Policy
-- summary: `Raise priority for proposals that directly target transfer stability after an audit_blocked result.`
+- summary: `Cap simultaneous fingerprint changes at 2–3 per candidate to isolate stall causes; force fingerprint rotation after 3 consecutive stalls; add transfer-stability pre-check before full runs; penalise startup-timeout-prone configurations in proposal scoring.`
 - selection_mode: `stabilize`
 - cooldown_multiplier: `2.0`
 - preferred_runner_backend: `command`
@@ -90,6 +101,6 @@ The GitHub repo is the lab dashboard.
 - `evaluation` addressed by `930a088`: `Implemented a transfer-stability smoke gate before full audit.`
 
 ## Diversity
-- summary: `Recent branching still has room, but `budget_policy_changed` is the current active line.`
+- summary: `Recent branching still has room, but `loss_recipe_changed` is the current active line.`
 - current_mechanism_streak: `1`
 - novelty_step_recommended: `False`
