@@ -18,6 +18,9 @@ from harness_lab.memory import read_json
 from harness_lab.outcome import CandidateOutcome, update_outcome_for_candidate
 from harness_lab.simulator import simulate_candidate_outcome
 
+STALE_TIMEOUT_DEFAULT = 600  # seconds before a command backend process is killed
+EARLY_CRASH_THRESHOLD = 5.0  # seconds — anything shorter is "crashed_early"
+
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -28,6 +31,120 @@ class RunnerResult:
     candidate_id: str
     backend: str
     outcome: CandidateOutcome
+
+
+def build_environment_preflight(
+    repo_dir: Path,
+    candidates_dir: Path,
+    candidate_id: str,
+    dataset_id: str,
+    dataset_record: dict | None,
+    hardware_profile: dict,
+    backend_command: list[str],
+) -> dict:
+    """Gather a compact preflight summary of toolchain, dataset readiness, and backend path."""
+    dataset_status = "not_configured"
+    dataset_path = ""
+    if dataset_record:
+        dataset_status = str(dataset_record.get("status", "unknown"))
+        dataset_path = str(dataset_record.get("local_path", ""))
+    return {
+        "candidate_id": candidate_id,
+        "python_version": sys.version.split()[0],
+        "working_directory": str(repo_dir),
+        "backend_command": backend_command,
+        "dataset_id": dataset_id,
+        "dataset_status": dataset_status,
+        "dataset_path": dataset_path,
+        "hostname": str(hardware_profile.get("hostname", "")),
+        "environment_hint": str(hardware_profile.get("environment_hint", "")),
+        "cpu_count": hardware_profile.get("cpu_count"),
+        "memory_gb_estimate": hardware_profile.get("memory_gb_estimate"),
+    }
+
+
+def classify_process_behavior(
+    duration_seconds: float,
+    returncode: int,
+    poll_interval_seconds: float,
+    stale_timeout: float,
+) -> dict:
+    """Classify how a command backend process behaved based on its runtime profile."""
+    if returncode != 0 and duration_seconds < EARLY_CRASH_THRESHOLD:
+        classification = "crashed_early"
+    elif duration_seconds >= stale_timeout:
+        classification = "stalled"
+    elif duration_seconds < poll_interval_seconds * 2:
+        classification = "completed_quickly"
+    elif duration_seconds > stale_timeout * 0.5:
+        classification = "slow_completion"
+    else:
+        classification = "normal_completion"
+    return {
+        "classification": classification,
+        "duration_seconds": round(duration_seconds, 3),
+        "returncode": returncode,
+        "poll_count_estimate": max(1, int(duration_seconds / max(poll_interval_seconds, 0.01))),
+    }
+
+
+def compute_throughput_accounting(
+    duration_seconds: float,
+    poll_interval_seconds: float,
+    stale_timeout: float,
+) -> dict:
+    """Compute wall-clock throughput accounting for a command run."""
+    early = duration_seconds < stale_timeout * 0.5
+    saved = max(0.0, stale_timeout - duration_seconds) if early else 0.0
+    return {
+        "wall_clock_seconds": round(duration_seconds, 3),
+        "poll_interval_seconds": poll_interval_seconds,
+        "stale_timeout_seconds": stale_timeout,
+        "estimated_idle_polls": max(0, int(duration_seconds / max(poll_interval_seconds, 0.01)) - 1),
+        "early_completion_detected": early,
+        "time_saved_estimate_seconds": round(saved, 3),
+    }
+
+
+def build_preflight_bundle(
+    candidates_dir: Path,
+    memory_dir: Path,
+    candidate_id: str,
+) -> dict:
+    """Package the most relevant files for a candidate into one place before execution."""
+    candidate_dir = candidates_dir / candidate_id
+
+    def _safe_read(path: Path) -> dict:
+        if path.exists():
+            return read_json(path)
+        return {}
+
+    bootstrap = _safe_read(candidate_dir / "memory" / "bootstrap_snapshot.json")
+    execution_plan = _safe_read(candidate_dir / "execution" / "plan.json")
+    proposal = _safe_read(candidate_dir / "proposal.json")
+    diagnosis = _safe_read(candidate_dir / "diagnosis" / "summary.json")
+    backend_profile = _safe_read(memory_dir / "backend_profile.json")
+    dataset_registry = _safe_read(memory_dir / "datasets.json")
+
+    ready = bool(
+        proposal.get("status") not in {"", "draft"} or execution_plan.get("status") not in {"", "draft"}
+    )
+
+    return {
+        "candidate_id": candidate_id,
+        "preflight_ready": ready,
+        "bootstrap_snapshot": bootstrap,
+        "execution_plan": execution_plan,
+        "proposal": proposal,
+        "diagnosis": diagnosis,
+        "backend_profile": backend_profile,
+        "dataset_readiness": {
+            "dataset_count": len(dataset_registry.get("datasets", [])),
+            "ready_datasets": [
+                d.get("dataset_id", "") for d in dataset_registry.get("datasets", []) if d.get("status") == "ready"
+            ],
+        },
+    }
 
 
 def _dataset_context(candidates_dir: Path, candidate_id: str) -> tuple[str, dict | None]:
@@ -107,6 +224,9 @@ def _write_trace(
     stderr_path: Path,
     outcome: CandidateOutcome,
     result_path: Path | None = None,
+    environment_preflight: dict | None = None,
+    process_classification: dict | None = None,
+    throughput_accounting: dict | None = None,
 ) -> None:
     trace_payload = {
         "candidate_id": candidate_id,
@@ -125,10 +245,27 @@ def _write_trace(
         trace_payload["poll_interval_seconds"] = poll_interval_seconds
     if result_path is not None:
         trace_payload["backend_result_path"] = str(result_path.relative_to(candidates_dir / candidate_id))
-    (candidates_dir / candidate_id / "traces" / "run.json").write_text(
+    if environment_preflight is not None:
+        trace_payload["environment_preflight"] = environment_preflight
+    if process_classification is not None:
+        trace_payload["process_classification"] = process_classification
+    if throughput_accounting is not None:
+        trace_payload["throughput_accounting"] = throughput_accounting
+    trace_dir = candidates_dir / candidate_id / "traces"
+    (trace_dir / "run.json").write_text(
         json.dumps(trace_payload, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    if environment_preflight is not None:
+        (trace_dir / "environment_preflight.json").write_text(
+            json.dumps(environment_preflight, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+    if throughput_accounting is not None:
+        (trace_dir / "throughput.json").write_text(
+            json.dumps(throughput_accounting, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
 
 
 def _run_simulated_backend(
