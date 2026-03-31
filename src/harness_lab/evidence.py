@@ -106,7 +106,11 @@ def _load_snapshot_file(candidate_root: Path, relative_path: str) -> list[str]:
 
 
 def _science_backend_fingerprints(relative_path: str, parent_lines: list[str], child_lines: list[str]) -> list[str]:
-    if relative_path != "src/harness_lab/science_backend.py":
+    if relative_path not in {
+        "src/harness_lab/science_backend.py",
+        "src/harness_lab/science_model.py",
+        "src/harness_lab/science_loss.py",
+    }:
         return []
     joined = "".join(parent_lines) + "\n" + "".join(child_lines)
     fingerprints: list[str] = []
