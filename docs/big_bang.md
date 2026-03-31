@@ -6,10 +6,10 @@ The GitHub repo is the lab dashboard.
 - status: `running`
 - vital_spark_at: `2026-03-31T10:12:12+00:00`
 - started_at: `2026-03-31T10:12:12+00:00`
-- last_heartbeat: `2026-03-31T10:22:13+00:00`
-- cycles_completed: `1`
+- last_heartbeat: `2026-03-31T10:32:47+00:00`
+- cycles_completed: `2`
 - genesis seed: `cand_0001`
-- last candidate: `cand_0001`
+- last candidate: `cand_0002`
 - last dataset: `abc_boundary512_v64`
 - last commit: `-`
 - last publish message: `Publishing skipped.`
@@ -17,9 +17,9 @@ The GitHub repo is the lab dashboard.
 - novelty cycles triggered: `0`
 
 ## Latest Step
-- candidate: `cand_0001`
+- candidate: `cand_0002`
 - dataset: `abc_boundary512_v64` via `reused_prepared_dataset`
-- seed action: `genesis_ready`
+- seed action: `existing`
 - proposal status: `candidate`
 - outcome status: `complete`
 - diagnosis status: `complete`
@@ -29,36 +29,39 @@ The GitHub repo is the lab dashboard.
 - cycle mode: `normal_cycle`
 
 ## Recent Candidates
+- `cand_0002`: outcome `keeper`; diagnosis `complete`; benchmark `0.3137731112243285`
 - `cand_0001`: outcome `audit_blocked`; diagnosis `complete`; benchmark `0.28454701816760136`
 
 ## Science Leaders
-- best benchmark: `cand_0001` -> `0.28454701816760136`
-- best audit: `cand_0001` -> `0.3157135872847558`
-- tightest transfer: `cand_0001` -> gap `-0.03116656911715443`
-- best stable: `-` -> audit `-`
+- best benchmark: `cand_0002` -> `0.3137731112243285`
+- best audit: `cand_0002` -> `0.32560572881739014`
+- tightest transfer: `cand_0002` -> gap `-0.011832617593061645`
+- best stable: `cand_0002` -> audit `0.32560572881739014`
 
 ## Science Trend
-- summary: `Across the last 1 scored candidates, benchmark averaged 0.284547, audit averaged 0.315714, and the mean transfer gap was -0.031167.`
-- recent benchmark avg: `0.28454701816760136`
-- recent audit avg: `0.3157135872847558`
-- recent transfer gap avg: `-0.03116656911715443`
+- summary: `Across the last 2 scored candidates, benchmark averaged 0.299160, audit averaged 0.320660, and the mean transfer gap was -0.021500.`
+- recent benchmark avg: `0.2991600646959649`
+- recent audit avg: `0.320659658051073`
+- recent transfer gap avg: `-0.021499593355108038`
+- `cand_0002`: benchmark `0.3137731112243285`, audit `0.32560572881739014`, gap `-0.011832617593061645`
 - `cand_0001`: benchmark `0.28454701816760136`, audit `0.3157135872847558`, gap `-0.03116656911715443`
 
 ## Hindsight
 - summary: `The lab saw 1 audit-blocked outcomes; it should have emphasized transfer-stability checks earlier.`
 - adjustment: `Raise priority for proposals that directly target transfer stability after an audit_blocked result.`
+- adjustment: `Bias the next parent/proposal choice toward `initial_harness`.`
 
 ## Policy
 - summary: `Raise priority for proposals that directly target transfer stability after an audit_blocked result.`
-- selection_mode: `balanced`
+- selection_mode: `exploit_underexplored`
 - cooldown_multiplier: `1.0`
 - preferred_runner_backend: `command`
 - publish_every_cycles: `1`
 - novelty_cycle_priority: `normal`
 
 ## Budget
-- summary: `Use normal exploration budgeting.`
-- exploration_mode: `balanced`
+- summary: `Give extra follow-up budget to promising mechanisms like initial_harness.`
+- exploration_mode: `focus_promising`
 - tracked_mechanisms: `1`
 
 ## Backend
@@ -69,5 +72,5 @@ The GitHub repo is the lab dashboard.
 
 ## Diversity
 - summary: `Recent branching still has room, but `initial_harness` is the current active line.`
-- current_mechanism_streak: `1`
+- current_mechanism_streak: `2`
 - novelty_step_recommended: `False`
