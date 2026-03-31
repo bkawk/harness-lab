@@ -6,18 +6,18 @@ The GitHub repo is the lab dashboard.
 - status: `running`
 - vital_spark_at: `2026-03-31T10:12:12+00:00`
 - started_at: `2026-03-31T11:03:54+00:00`
-- last_heartbeat: `2026-03-31T11:24:30+00:00`
-- cycles_completed: `2`
+- last_heartbeat: `2026-03-31T11:35:05+00:00`
+- cycles_completed: `3`
 - genesis seed: `cand_0001`
-- last candidate: `cand_0008`
+- last candidate: `cand_0009`
 - last dataset: `abc_boundary512`
 - last commit: `-`
 - last publish message: `Publishing skipped.`
 - last cycle mode: `novelty_cycle`
-- novelty cycles triggered: `2`
+- novelty cycles triggered: `3`
 
 ## Latest Step
-- candidate: `cand_0008`
+- candidate: `cand_0009`
 - dataset: `abc_boundary512` via `reused_prepared_dataset`
 - seed action: `existing`
 - proposal status: `candidate`
@@ -29,23 +29,24 @@ The GitHub repo is the lab dashboard.
 - cycle mode: `novelty_cycle`
 
 ## Recent Candidates
+- `cand_0009`: outcome `keeper`; diagnosis `complete`; benchmark `0.3027662528883464`
 - `cand_0008`: outcome `keeper`; diagnosis `complete`; benchmark `0.32574714077255956`
 - `cand_0007`: outcome `audit_blocked`; diagnosis `complete`; benchmark `0.382538488978586`
 - `cand_0006`: outcome `-`; diagnosis `empty`; benchmark `None`
 - `cand_0005`: outcome `improved`; diagnosis `complete`; benchmark `0.2932505653803283`
-- `cand_0004`: outcome `-`; diagnosis `empty`; benchmark `None`
 
 ## Science Leaders
 - best benchmark: `cand_0007` -> `0.382538488978586`
 - best audit: `cand_0003` -> `0.33766418014737687`
 - tightest transfer: `cand_0008` -> gap `0.00592187393956084`
-- best stable: `cand_0002` -> audit `0.32560572881739014`
+- best stable: `cand_0009` -> audit `0.3292391423260943`
 
 ## Science Trend
-- summary: `Across the last 3 scored candidates, benchmark averaged 0.333845, audit averaged 0.315227, and the mean transfer gap was 0.018619.`
-- recent benchmark avg: `0.33384539837715793`
-- recent audit avg: `0.3152268697221455`
-- recent transfer gap avg: `0.01861852865501244`
+- summary: `Across the last 4 scored candidates, benchmark averaged 0.326076, audit averaged 0.318730, and the mean transfer gap was 0.007346.`
+- recent benchmark avg: `0.32607561200495505`
+- recent audit avg: `0.3187299378731327`
+- recent transfer gap avg: `0.007345674131822355`
+- `cand_0009`: benchmark `0.3027662528883464`, audit `0.3292391423260943`, gap `-0.026472889437747893`
 - `cand_0008`: benchmark `0.32574714077255956`, audit `0.3198252668329987`, gap `0.00592187393956084`
 - `cand_0007`: benchmark `0.382538488978586`, audit `0.31839459354361344`, gap `0.06414389543497256`
 - `cand_0005`: benchmark `0.2932505653803283`, audit `0.3074607487898244`, gap `-0.014210183409496091`
