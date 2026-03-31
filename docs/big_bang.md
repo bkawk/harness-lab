@@ -5,19 +5,19 @@ The GitHub repo is the lab dashboard.
 ## State
 - status: `running`
 - vital_spark_at: `2026-03-31T10:12:12+00:00`
-- started_at: `2026-03-31T20:10:40+00:00`
-- last_heartbeat: `2026-03-31T20:14:15+00:00`
-- cycles_completed: `7`
+- started_at: `2026-03-31T20:14:46+00:00`
+- last_heartbeat: `2026-03-31T20:14:47+00:00`
+- cycles_completed: `1`
 - genesis seed: `cand_0001`
-- last candidate: `cand_0123`
+- last candidate: `cand_0124`
 - last dataset: `abc_boundary512`
 - last commit: `-`
 - last publish message: `Publishing skipped.`
 - last cycle mode: `novelty_cycle`
-- novelty cycles triggered: `7`
+- novelty cycles triggered: `1`
 
 ## Latest Step
-- candidate: `cand_0123`
+- candidate: `cand_0124`
 - dataset: `abc_boundary512` via `reused_prepared_dataset`
 - seed action: `existing`
 - proposal status: `candidate`
@@ -37,11 +37,11 @@ The GitHub repo is the lab dashboard.
 - backend_poll_interval_seconds: `-`
 
 ## Recent Candidates
+- `cand_0124`: outcome `audit_blocked`; diagnosis `complete`; benchmark `0.302`
 - `cand_0123`: outcome `audit_blocked`; diagnosis `complete`; benchmark `0.277`
 - `cand_0122`: outcome `audit_blocked`; diagnosis `complete`; benchmark `0.374`
 - `cand_0121`: outcome `audit_blocked`; diagnosis `complete`; benchmark `0.38`
 - `cand_0120`: outcome `audit_blocked`; diagnosis `complete`; benchmark `0.327`
-- `cand_0119`: outcome `audit_blocked`; diagnosis `complete`; benchmark `0.446`
 
 ## Science Leaders
 - best benchmark: `cand_0103` -> `0.448`
@@ -50,18 +50,18 @@ The GitHub repo is the lab dashboard.
 - best stable: `cand_0009` -> audit `0.3292391423260943`
 
 ## Science Trend
-- summary: `Across the last 5 scored candidates, benchmark averaged 0.360800, audit averaged 0.330300, and the mean transfer gap was 0.030500.`
-- recent benchmark avg: `0.3608`
-- recent audit avg: `0.3303`
-- recent transfer gap avg: `0.030500000000000027`
+- summary: `Across the last 5 scored candidates, benchmark averaged 0.332000, audit averaged 0.301100, and the mean transfer gap was 0.030900.`
+- recent benchmark avg: `0.332`
+- recent audit avg: `0.30110000000000003`
+- recent transfer gap avg: `0.030900000000000018`
+- `cand_0124`: benchmark `0.302`, audit `0.2625`, gap `0.03949999999999998`
 - `cand_0123`: benchmark `0.277`, audit `0.2485`, gap `0.028500000000000025`
 - `cand_0122`: benchmark `0.374`, audit `0.348`, gap `0.026000000000000023`
 - `cand_0121`: benchmark `0.38`, audit `0.354`, gap `0.026000000000000023`
 - `cand_0120`: benchmark `0.327`, audit `0.2925`, gap `0.03450000000000003`
-- `cand_0119`: benchmark `0.446`, audit `0.4085`, gap `0.03750000000000003`
 
 ## Hindsight
-- summary: `The lab saw 45 audit-blocked outcomes; it should have emphasized transfer-stability checks earlier.`
+- summary: `The lab saw 46 audit-blocked outcomes; it should have emphasized transfer-stability checks earlier.`
 - adjustment: `Raise priority for proposals that directly target transfer stability after an audit_blocked result.`
 
 ## Policy
@@ -98,8 +98,8 @@ The GitHub repo is the lab dashboard.
 - [7] `dataset`: `Consider improving the validation split or transfer-oriented data slices so the lab can distinguish local wins from robust gains sooner.`
 
 ## What We Did
-- summary: `No recent human responses recorded yet.`
-- no recent human responses recorded yet
+- summary: `The humans recently addressed 1 lab request(s).`
+- `seed_backend` addressed by `3b2a48c`: `Split the seed backend into more explicit evolvable modules so the lab can steer model, loss, eval, and config changes more precisely.`
 
 ## Diversity
 - summary: `The lab has stayed on `initial_harness` for 6 recent candidates; inject a novelty step.`
