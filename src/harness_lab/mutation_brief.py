@@ -94,6 +94,7 @@ def _scored_candidates_since_commit(memory_dir: Path, commit_sha: str) -> list[d
 
 
 def build_mutation_brief(candidates_dir: Path, memory_dir: Path) -> dict:
+    min_scored_candidates_after_change = 5
     human_feedback = read_human_feedback(memory_dir)
     hindsight = read_hindsight(memory_dir)
     policy = read_policy(memory_dir)
@@ -111,7 +112,7 @@ def build_mutation_brief(candidates_dir: Path, memory_dir: Path) -> dict:
     repo_dir = memory_dir.parent.parent
     last_structural_commit = _last_structural_commit(repo_dir)
     scored_since_change = _scored_candidates_since_commit(memory_dir, last_structural_commit)
-    enough_recent_signal = len(scored_since_change) >= 3
+    enough_recent_signal = len(scored_since_change) >= min_scored_candidates_after_change
     scored_since_change_note = (
         f"{len(scored_since_change)} scored candidate(s) have landed since structural commit `{last_structural_commit[:7]}`."
         if last_structural_commit
@@ -120,7 +121,7 @@ def build_mutation_brief(candidates_dir: Path, memory_dir: Path) -> dict:
     if not enough_recent_signal:
         module_rationale = f"{module_rationale} Hold off on a mutation until the post-change sample is less thin. {scored_since_change_note}"
     wait_reason = (
-        f"Only {len(scored_since_change)} scored candidate(s) have landed since the last structural change; wait for a slightly larger post-change sample."
+        f"Only {len(scored_since_change)} scored candidate(s) have landed since the last structural change; wait until at least {min_scored_candidates_after_change} post-change scored candidates exist."
         if last_structural_commit and not enough_recent_signal
         else "Recent evidence may still be too thin or too noisy; a few more scored candidates could produce a cleaner signal."
     )

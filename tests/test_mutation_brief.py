@@ -90,6 +90,8 @@ def test_mutation_brief_recommends_mutation_after_enough_post_change_signal(tmp_
                 {"candidate_id": "cand_0001", "source_commit": "abc123", "benchmark_score": 0.3, "audit_score": 0.27},
                 {"candidate_id": "cand_0002", "source_commit": "abc123", "benchmark_score": 0.31, "audit_score": 0.28},
                 {"candidate_id": "cand_0003", "source_commit": "abc123", "benchmark_score": 0.29, "audit_score": 0.26},
+                {"candidate_id": "cand_0004", "source_commit": "abc123", "benchmark_score": 0.32, "audit_score": 0.29},
+                {"candidate_id": "cand_0005", "source_commit": "abc123", "benchmark_score": 0.33, "audit_score": 0.3},
             ]
         },
     )
