@@ -83,6 +83,8 @@ def render_big_bang_markdown(
     diversity_path = memory_dir / "diversity.json"
     backend_path = memory_dir / "backend_profile.json"
     science_summary_path = memory_dir / "science_summary.json"
+    mutation_brief_path = memory_dir / "mutation_brief.json"
+    backend_module_summary_path = memory_dir / "backend_module_summary.json"
     index = build_candidate_index(candidates_dir) if candidates_dir.exists() else {
         "candidate_count": 0,
         "candidates": [],
@@ -98,6 +100,8 @@ def render_big_bang_markdown(
     human_feedback = {}
     human_feedback_responses = {}
     science_summary = {}
+    mutation_brief = {}
+    backend_module_summary = {}
     live_command = {}
     if candidates_dir.exists():
         write_hindsight(candidates_dir, hindsight_path)
@@ -127,6 +131,10 @@ def render_big_bang_markdown(
     human_feedback_responses = read_human_feedback_responses(memory_dir)
     if science_summary_path.exists():
         science_summary = json.loads(science_summary_path.read_text(encoding="utf-8"))
+    if mutation_brief_path.exists():
+        mutation_brief = json.loads(mutation_brief_path.read_text(encoding="utf-8"))
+    if backend_module_summary_path.exists():
+        backend_module_summary = json.loads(backend_module_summary_path.read_text(encoding="utf-8"))
     active_candidate_id = str(state.get("active_candidate_id", "") or "")
     if active_candidate_id:
         live_command_path = candidates_dir / active_candidate_id / "traces" / "live_command.json"
@@ -158,6 +166,25 @@ def render_big_bang_markdown(
     ]
     if not response_lines:
         response_lines = ["- no recent human responses recorded yet"]
+    backend_module_lines = []
+    for item in backend_module_summary.get("modules", [])[:4]:
+        backend_module_lines.append(
+            f"- `{item.get('module', '-')}`: attempts `{item.get('attempts', 0)}`, "
+            f"audit_blocked `{item.get('audit_blocked_count', 0)}`, "
+            f"avg_gap `{item.get('avg_transfer_gap', '-')}`"
+        )
+    if not backend_module_lines:
+        backend_module_lines = ["- no backend module summary yet"]
+    backend_science_lines = [
+        f"- summary: `{backend_module_summary.get('summary', 'No backend-science summary yet.')}`",
+        f"- recommended_action: `{mutation_brief.get('recommended_action', 'wait')}`",
+        f"- target_module: `{mutation_brief.get('target_module', '-') or '-'}`",
+        f"- problem: `{mutation_brief.get('problem_statement', 'No current backend-science problem statement yet.')}`",
+        f"- why_this_module: `{mutation_brief.get('module_rationale', 'No module rationale yet.')}`",
+        f"- secondary_context: `{mutation_brief.get('science_debug_summary', 'No secondary backend-science context yet.')}`",
+        f"- scored_candidates_since_change: `{mutation_brief.get('context', {}).get('scored_candidates_since_change', '-')}`",
+        f"- last_structural_commit: `{str(mutation_brief.get('context', {}).get('last_structural_commit', '') or '-')[:7]}`",
+    ]
 
     recent = list(index.get("candidates", []))[-5:]
     recent_lines = []
@@ -283,6 +310,10 @@ def render_big_bang_markdown(
             f"- preferred_backend: `{backend.get('preferred_backend', '-')}`",
             f"- available_backends: `{', '.join(backend.get('available_backends', [])) or '-'}`",
             f"- command_backend_configured: `{backend.get('command_backend_configured', False)}`",
+            "",
+            "## Backend Science",
+            *backend_science_lines,
+            *backend_module_lines,
             "",
             "## External Review",
             f"- status: `{external_review.get('status', 'idle')}`",
