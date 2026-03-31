@@ -6,6 +6,7 @@ import os
 import time
 from dataclasses import asdict
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 import torch
@@ -62,6 +63,28 @@ class ScienceRunResult:
     benchmark_summary: str
     audit_summary: str
     evidence: list[str]
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def write_science_progress(trace_dir: Path, phase: str, **payload: object) -> None:
+    trace_dir.mkdir(parents=True, exist_ok=True)
+    progress = {
+        "updated_at": utc_now(),
+        "phase": phase,
+        **payload,
+    }
+    (trace_dir / "science_progress.json").write_text(
+        json.dumps(progress, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    details = " ".join(f"{key}={value}" for key, value in payload.items())
+    if details:
+        print(f"science-progress: {phase} {details}", flush=True)
+    else:
+        print(f"science-progress: {phase}", flush=True)
 
 
 class CompactPointModel(nn.Module):
@@ -372,12 +395,34 @@ def run_science_backend(
     if hasattr(torch, "set_float32_matmul_precision"):
         torch.set_float32_matmul_precision("high")
 
+    trace_dir.mkdir(parents=True, exist_ok=True)
+    write_science_progress(trace_dir, "initializing", candidate_id=candidate_id)
     cfg = derive_config(candidate_id, proposal, diagnosis)
+    write_science_progress(
+        trace_dir,
+        "config_ready",
+        candidate_id=candidate_id,
+        time_budget_seconds=cfg.time_budget_seconds,
+        batch_size=cfg.batch_size,
+        eval_batch_size=cfg.eval_batch_size,
+        hidden_dim=cfg.hidden_dim,
+        global_dim=cfg.global_dim,
+        k_neighbors=cfg.k_neighbors,
+    )
     metadata = load_metadata(dataset_root)
     spec = get_dataset_spec(dataset_root)
     device = get_device()
     param_scale = torch.tensor(spec.param_scale, dtype=torch.float32, device=device)
     num_classes = len(spec.class_names)
+    write_science_progress(
+        trace_dir,
+        "dataset_loaded",
+        candidate_id=candidate_id,
+        device=device.type,
+        train_splits=len(metadata.get("splits", {}).get("train", [])),
+        val_splits=len(metadata.get("splits", {}).get("val", [])),
+        num_classes=num_classes,
+    )
 
     train_dataset = PackedShardDataset(dataset_root, "train")
     benchmark_dataset, smoke_dataset, audit_dataset = make_transfer_eval_splits(dataset_root)
@@ -385,6 +430,15 @@ def run_science_backend(
     benchmark_loader = make_dataloader(benchmark_dataset, cfg.eval_batch_size, shuffle=False)
     smoke_loader = make_dataloader(smoke_dataset, cfg.eval_batch_size, shuffle=False)
     audit_loader = make_dataloader(audit_dataset, cfg.eval_batch_size, shuffle=False)
+    write_science_progress(
+        trace_dir,
+        "dataloaders_ready",
+        candidate_id=candidate_id,
+        train_samples=len(train_dataset),
+        benchmark_samples=len(benchmark_dataset),
+        smoke_samples=len(smoke_dataset),
+        audit_samples=len(audit_dataset),
+    )
 
     model = CompactPointModel(
         num_classes=num_classes,
@@ -396,6 +450,13 @@ def run_science_backend(
         instance_modulation_scale=cfg.instance_modulation_scale,
     ).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
+    write_science_progress(
+        trace_dir,
+        "model_ready",
+        candidate_id=candidate_id,
+        device=device.type,
+        parameter_count=sum(param.numel() for param in model.parameters()),
+    )
 
     if device.type == "cuda":
         torch.cuda.reset_peak_memory_stats(device)
@@ -405,6 +466,8 @@ def run_science_backend(
     deadline = start + cfg.time_budget_seconds
     steps = 0
     last_stats = {"loss": math.nan, "cls_loss": math.nan, "param_loss": math.nan, "boundary_loss": math.nan, "instance_loss": math.nan}
+    last_progress_emit = start
+    write_science_progress(trace_dir, "training_started", candidate_id=candidate_id, deadline_seconds=cfg.time_budget_seconds)
 
     while time.time() < deadline:
         try:
@@ -429,18 +492,74 @@ def run_science_backend(
         nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
         optimizer.step()
         steps += 1
+        now = time.time()
+        if steps == 1 or steps % cfg.log_interval == 0 or (now - last_progress_emit) >= 30.0:
+            elapsed = now - start
+            write_science_progress(
+                trace_dir,
+                "training",
+                candidate_id=candidate_id,
+                steps=steps,
+                elapsed_seconds=round(elapsed, 3),
+                remaining_seconds=max(0.0, round(deadline - now, 3)),
+                loss=round(float(last_stats["loss"]), 6),
+                cls_loss=round(float(last_stats["cls_loss"]), 6),
+                param_loss=round(float(last_stats["param_loss"]), 6),
+                boundary_loss=round(float(last_stats["boundary_loss"]), 6),
+                instance_loss=round(float(last_stats["instance_loss"]), 6),
+                peak_vram_mb=peak_vram_mb(device),
+            )
+            last_progress_emit = now
 
     training_seconds = time.time() - start
+    write_science_progress(
+        trace_dir,
+        "training_complete",
+        candidate_id=candidate_id,
+        steps=steps,
+        training_seconds=round(training_seconds, 3),
+        peak_vram_mb=peak_vram_mb(device),
+    )
+    write_science_progress(trace_dir, "benchmark_eval_started", candidate_id=candidate_id, steps=steps)
     benchmark_metrics = evaluate_model(model, benchmark_loader, device, param_scale=param_scale, num_classes=num_classes)
+    write_science_progress(
+        trace_dir,
+        "benchmark_eval_complete",
+        candidate_id=candidate_id,
+        benchmark_score=round(float(benchmark_metrics["val_score"]), 6),
+        benchmark_boundary_f1=round(float(benchmark_metrics.get("boundary_f1", 0.0)), 6),
+    )
+    write_science_progress(trace_dir, "smoke_eval_started", candidate_id=candidate_id)
     smoke_metrics = evaluate_model(model, smoke_loader, device, param_scale=param_scale, num_classes=num_classes)
+    write_science_progress(
+        trace_dir,
+        "smoke_eval_complete",
+        candidate_id=candidate_id,
+        smoke_score=round(float(smoke_metrics["val_score"]), 6),
+        smoke_boundary_f1=round(float(smoke_metrics.get("boundary_f1", 0.0)), 6),
+    )
     full_audit_completed, smoke_failure_reasons = should_run_full_audit(benchmark_metrics, smoke_metrics, cfg)
     if full_audit_completed:
+        write_science_progress(trace_dir, "audit_eval_started", candidate_id=candidate_id)
         audit_metrics = evaluate_model(model, audit_loader, device, param_scale=param_scale, num_classes=num_classes)
+        write_science_progress(
+            trace_dir,
+            "audit_eval_complete",
+            candidate_id=candidate_id,
+            audit_score=round(float(audit_metrics["val_score"]), 6),
+            audit_boundary_f1=round(float(audit_metrics.get("boundary_f1", 0.0)), 6),
+        )
         outcome_label, observed_failure_modes = classify_outcome(benchmark_metrics, audit_metrics, steps)
     else:
         audit_metrics = dict(smoke_metrics)
         audit_metrics["audit_skipped_after_smoke"] = True
         audit_metrics["smoke_failure_reasons"] = list(smoke_failure_reasons)
+        write_science_progress(
+            trace_dir,
+            "audit_skipped_after_smoke",
+            candidate_id=candidate_id,
+            smoke_failure_reasons=",".join(smoke_failure_reasons),
+        )
         outcome_label, observed_failure_modes = classify_smoke_block(benchmark_metrics, smoke_metrics, steps, smoke_failure_reasons)
 
     benchmark_summary = (
@@ -477,7 +596,6 @@ def run_science_backend(
         f"science:val_audit_samples:{len(audit_dataset)}",
     ]
 
-    trace_dir.mkdir(parents=True, exist_ok=True)
     (trace_dir / "science_config.json").write_text(json.dumps(asdict(cfg), indent=2, sort_keys=True) + "\n", encoding="utf-8")
     (trace_dir / "science_metrics.json").write_text(
         json.dumps(
@@ -500,6 +618,14 @@ def run_science_backend(
         )
         + "\n",
         encoding="utf-8",
+    )
+    write_science_progress(
+        trace_dir,
+        "result_ready",
+        candidate_id=candidate_id,
+        outcome_label=outcome_label,
+        benchmark_score=round(float(benchmark_metrics["val_score"]), 6),
+        audit_score=round(float(audit_metrics["val_score"]), 6),
     )
 
     return ScienceRunResult(
