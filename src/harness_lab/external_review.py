@@ -187,12 +187,17 @@ def _llm_review_prompt(index: dict, hindsight: dict, policy: dict, trigger_reaso
         "trigger_reason": trigger_reason,
         "candidate_count": candidate_count,
         "policy_summary": policy.get("summary", ""),
+        "policy_selection_mode": policy.get("selection_mode", "balanced"),
+        "policy_adjustments": policy.get("policy_adjustments", [])[:5],
+        "hindsight_findings": hindsight.get("hindsight_findings", [])[:5],
         "top_outcomes": hindsight.get("top_outcomes", []),
         "top_failure_modes": hindsight.get("top_failure_modes", []),
         "over_explored_mechanisms": hindsight.get("over_explored_mechanisms", []),
         "under_explored_promising_mechanisms": hindsight.get("under_explored_promising_mechanisms", []),
         "over_explored_backend_fingerprints": hindsight.get("over_explored_backend_fingerprints", []),
         "under_explored_backend_fingerprints": hindsight.get("under_explored_backend_fingerprints", []),
+        "process_classification_counts": hindsight.get("process_classification_counts", {}),
+        "throughput_summary": hindsight.get("throughput_summary", {}),
         "recent_candidates": compact_recent,
     }
     return (

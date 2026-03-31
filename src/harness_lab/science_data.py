@@ -125,6 +125,29 @@ def make_eval_splits(dataset_root: Path) -> tuple[Dataset, Dataset]:
     return benchmark, audit
 
 
+def make_transfer_eval_splits(dataset_root: Path) -> tuple[Dataset, Dataset, Dataset]:
+    val_dataset = PackedShardDataset(dataset_root, "val")
+    count = len(val_dataset)
+    if count < 3:
+        return val_dataset, val_dataset, val_dataset
+
+    benchmark_midpoint = max(1, count // 2)
+    benchmark = Subset(val_dataset, range(0, benchmark_midpoint))
+
+    remaining_start = benchmark_midpoint
+    remaining_count = count - remaining_start
+    smoke_count = max(1, remaining_count // 2)
+    smoke_end = min(count, remaining_start + smoke_count)
+    smoke = Subset(val_dataset, range(remaining_start, smoke_end))
+    audit = Subset(val_dataset, range(smoke_end, count))
+
+    if len(smoke) == 0:
+        smoke = benchmark
+    if len(audit) == 0:
+        audit = smoke
+    return benchmark, smoke, audit
+
+
 def move_batch_to_device(batch: dict[str, torch.Tensor], device: torch.device) -> dict[str, torch.Tensor]:
     moved: dict[str, torch.Tensor] = {}
     for key, value in batch.items():

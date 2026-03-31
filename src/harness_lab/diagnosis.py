@@ -230,8 +230,14 @@ def reconcile_diagnosis_from_outcome(candidates_dir: Path, candidate_id: str) ->
             "runner_stdout_tail": _safe_read_text(candidate_dir / "traces" / "runner_stdout.log"),
             "runner_stderr_tail": _safe_read_text(candidate_dir / "traces" / "runner_stderr.log"),
         }
+        parent_id = proposal.get("parent_id") or diagnosis.get("parent_id")
+        parent_diag = None
+        if parent_id:
+            parent_diag_path = candidates_dir / str(parent_id) / "diagnosis" / "summary.json"
+            if parent_diag_path.exists():
+                parent_diag = read_json(parent_diag_path)
         payload = run_claude_json(
-            _llm_diagnosis_prompt(candidate_id, proposal, outcome, heuristic_fields, traces),
+            _llm_diagnosis_prompt(candidate_id, proposal, outcome, heuristic_fields, traces, parent_diagnosis=parent_diag),
             cwd=candidate_dir,
         )
         normalized = _normalize_llm_diagnosis_payload(payload or {}, heuristic_fields)

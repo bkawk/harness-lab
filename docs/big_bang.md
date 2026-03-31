@@ -6,21 +6,30 @@ The GitHub repo is the lab dashboard.
 - status: `running`
 - vital_spark_at: `2026-03-31T10:12:12+00:00`
 - started_at: `2026-03-31T14:20:19+00:00`
-- last_heartbeat: `2026-03-31T14:20:34+00:00`
+- last_heartbeat: `2026-03-31T14:34:39+00:00`
 - cycles_completed: `1`
 - genesis seed: `cand_0001`
-- last candidate: `cand_0026`
+- last candidate: `cand_0030`
 - last dataset: `abc_boundary512`
-- last commit: `f36022df8375abd455c26bd2f60e1a97523a2ed7`
-- last publish message: `Published f36022df8375abd455c26bd2f60e1a97523a2ed7 to origin/main.`
+- last commit: `-`
+- last publish message: `Publishing skipped.`
 - last cycle mode: `normal_cycle`
 - novelty cycles triggered: `0`
 
 ## Latest Step
-- no completed big-bang step yet
+- candidate: `cand_0030`
+- dataset: `abc_boundary512` via `reused_prepared_dataset`
+- seed action: `existing`
+- proposal status: `candidate`
+- outcome status: `complete`
+- diagnosis status: `complete`
+- next top parent: `cand_0005`
+- published: `False`
+- commit: `-`
+- cycle mode: `normal_cycle`
 
 ## Active Backend
-- active_candidate: `cand_0030`
+- active_candidate: `-`
 - backend_status: `-`
 - backend_pid: `-`
 - backend_started_at: `-`
@@ -28,11 +37,11 @@ The GitHub repo is the lab dashboard.
 - backend_poll_interval_seconds: `-`
 
 ## Recent Candidates
+- `cand_0030`: outcome `stalled`; diagnosis `complete`; benchmark `None`
+- `cand_0029`: outcome `-`; diagnosis `empty`; benchmark `None`
+- `cand_0028`: outcome `-`; diagnosis `empty`; benchmark `None`
+- `cand_0027`: outcome `-`; diagnosis `empty`; benchmark `None`
 - `cand_0026`: outcome `stalled`; diagnosis `complete`; benchmark `None`
-- `cand_0025`: outcome `-`; diagnosis `empty`; benchmark `None`
-- `cand_0024`: outcome `-`; diagnosis `empty`; benchmark `None`
-- `cand_0023`: outcome `-`; diagnosis `empty`; benchmark `None`
-- `cand_0022`: outcome `-`; diagnosis `empty`; benchmark `None`
 
 ## Science Leaders
 - best benchmark: `cand_0013` -> `0.3847249926656351`
@@ -48,15 +57,15 @@ The GitHub repo is the lab dashboard.
 - no scored candidates yet
 
 ## Hindsight
-- summary: `After 28 candidates the lab's dominant failure mode is transfer instability: 6 audit_blocked outcomes plus 3 transfer_collapse and 2 transfer_regression failures. Only 1 candidate reached 'improved'. Recent runs (cand_0022–0029) are mostly unevaluated, with cand_0026 stalled on a loss_recipe_changed edit. Five under-explored backend fingerprints each show a single positive outcome, suggesting the lab should broaden its backend-edit repertoire rather than repeat well-trodden paths.`
-- adjustment: `Gate new candidates on a transfer-stability pre-check before full audit to catch collapse/regression early and reduce audit_blocked waste.`
-- adjustment: `Prioritize proposals that combine under-explored fingerprints (budget_policy_changed, fusion_changed, instance_path_changed, local_encoder_changed) with explicit transfer-stability safeguards.`
-- adjustment: `Investigate and clear the evaluation bottleneck blocking cand_0022–0025 and cand_0027–0029 before launching further candidates.`
+- summary: `After 29 candidates the lab's dominant failure mode is transfer instability: 6 audit_blocked outcomes plus 3 transfer_collapse and 2 transfer_regression failures. Two recent runs (cand_0026, cand_0030) stalled on loss_recipe_changed, and 6 of the last 8 candidates lack scored outcomes, signalling a data-completeness gap. The single 'improved' outcome came from a candidate touching budget_policy_changed, fusion_changed, instance_path_changed, local_encoder_changed, and loss_recipe_changed — all under-explored fingerprints with a positive audit signal (~0.31).`
+- adjustment: `Gate new candidate submissions on completing evaluation of the unscored backlog (cand_0023–cand_0029) before launching further runs.`
+- adjustment: `Raise priority for proposals that pair loss_recipe_changed with a transfer-stability edit (e.g., fusion_changed or budget_policy_changed) rather than using it alone.`
+- adjustment: `Raise priority for budget_policy_changed and instance_path_changed edits; both are under-explored with positive audit evidence.`
 
 ## Policy
-- summary: `Gate new candidates on a transfer-stability pre-check before full audit to catch collapse/regression early and reduce audit_blocked waste.`
-- selection_mode: `balanced`
-- cooldown_multiplier: `1.0`
+- summary: `Gate new candidate submissions on completing evaluation of the unscored backlog (cand_0023–cand_0029) before launching further runs. Transfer instability is the binding constraint; prioritize paired edits that combine loss_recipe_changed with stabilisation mechanisms.`
+- selection_mode: `stabilize`
+- cooldown_multiplier: `2.0`
 - preferred_runner_backend: `command`
 - publish_every_cycles: `1`
 - novelty_cycle_priority: `normal`
@@ -87,6 +96,6 @@ The GitHub repo is the lab dashboard.
 - [7] `dataset`: `Consider improving the validation split or transfer-oriented data slices so the lab can distinguish local wins from robust gains sooner.`
 
 ## Diversity
-- summary: `Recent branching still has room, but `instance_path_changed` is the current active line.`
+- summary: `Recent branching still has room, but `loss_recipe_changed` is the current active line.`
 - current_mechanism_streak: `1`
 - novelty_step_recommended: `False`
