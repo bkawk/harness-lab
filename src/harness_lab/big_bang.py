@@ -140,6 +140,16 @@ def render_big_bang_markdown(
         live_command_path = candidates_dir / active_candidate_id / "traces" / "live_command.json"
         if live_command_path.exists():
             live_command = json.loads(live_command_path.read_text(encoding="utf-8"))
+    lever_candidate_id = active_candidate_id or str(state.get("last_candidate_id", "") or "")
+    lever_payload = {}
+    if lever_candidate_id:
+        candidate_root = candidates_dir / lever_candidate_id
+        trace_lever_path = candidate_root / "traces" / "backend_levers.json"
+        proposal_path = candidate_root / "proposal.json"
+        if trace_lever_path.exists():
+            lever_payload = json.loads(trace_lever_path.read_text(encoding="utf-8"))
+        elif proposal_path.exists():
+            lever_payload = json.loads(proposal_path.read_text(encoding="utf-8")).get("backend_levers", {})
     external_lab_lines = [
         f"- lab advice: `{str(item.get('summary', '')).strip()}`"
         for item in external_review.get("lab_advice", [])[:3]
@@ -206,6 +216,14 @@ def render_big_bang_markdown(
         f"- scored_candidates_since_change: `{mutation_brief.get('context', {}).get('scored_candidates_since_change', '-')}`",
         f"- last_structural_commit: `{str(mutation_brief.get('context', {}).get('last_structural_commit', '') or '-')[:7]}`",
     ]
+    chosen_lever_lines = [f"- source_candidate: `{lever_candidate_id or '-'}`"]
+    for module_name, label in backend_levers:
+        module_values = lever_payload.get(module_name, {}) if isinstance(lever_payload, dict) else {}
+        if isinstance(module_values, dict) and module_values:
+            assignments = ", ".join(f"{key}={value}" for key, value in sorted(module_values.items()))
+            chosen_lever_lines.append(f"- {label}: `{assignments}`")
+    if len(chosen_lever_lines) == 1:
+        chosen_lever_lines.append("- no explicit lever values chosen yet")
 
     recent = list(index.get("candidates", []))[-5:]
     recent_lines = []
@@ -334,6 +352,9 @@ def render_big_bang_markdown(
             "",
             "## Backend Science",
             *backend_science_lines,
+            "### Chosen Lever Values",
+            *chosen_lever_lines,
+            "",
             "### Modular Levers",
             *backend_lever_lines,
             "",
