@@ -67,6 +67,7 @@ Right now `harness-lab` can:
 - use hindsight to influence parent ranking and next-step proposals
 - derive a policy state that changes cooldowns, backend preference, and publish cadence
 - trigger bounded external review with hard gates and cooldowns
+- optionally let Claude author that bounded external review while preserving a heuristic fallback
 - enforce follow-up budgets so exhausted mechanisms stop dominating the search
 - let budget force a broader branch when the current line has had enough chances
 - let short-term diversity trigger novelty steps before the search feels stale

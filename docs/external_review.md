@@ -27,6 +27,23 @@ And it is rate-limited:
 
 By default the repo ships with a heuristic reviewer so a fresh clone has a working review loop.
 
+Tier 2 adds an optional bounded Claude reviewer ahead of that heuristic fallback.
+
+Enable it with:
+
+- `HARNESS_LAB_LLM_REVIEW_ENABLED=1`
+
+Optional related knobs:
+
+- `HARNESS_LAB_CLAUDE_BIN`
+- `HARNESS_LAB_LLM_TIMEOUT_SECONDS`
+
+When enabled, the review fallback chain is:
+
+1. Claude review
+2. external review command
+3. heuristic review
+
 If you want a real LLM peer-review path later, set:
 
 - `HARNESS_LAB_EXTERNAL_REVIEW_COMMAND`

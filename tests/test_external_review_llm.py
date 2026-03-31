@@ -1,15 +1,11 @@
-"""Tests for Import 4: external review via command reviewer (Claude CLI)."""
+"""Tests for bounded external review fallback, including optional Claude review."""
 from __future__ import annotations
-
-import json
-from pathlib import Path
-
-import pytest
 
 from harness_lab.external_review import (
     _heuristic_review_payload,
     maybe_request_external_review,
 )
+from harness_lab import external_review as external_review_module
 from harness_lab.workspace import write_json
 
 
@@ -73,6 +69,36 @@ class TestExternalReviewFallbackChain:
         candidates_dir, memory_dir = self._setup_review_env(tmp_path)
         result = maybe_request_external_review(candidates_dir, memory_dir, force=True)
         # Command fails, so falls back to heuristic
+        assert result["reviewer"] == "heuristic"
+
+    def test_llm_reviewer_takes_priority_when_enabled(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("HARNESS_LAB_LLM_REVIEW_ENABLED", "1")
+        monkeypatch.delenv("HARNESS_LAB_EXTERNAL_REVIEW_COMMAND", raising=False)
+        candidates_dir, memory_dir = self._setup_review_env(tmp_path)
+        monkeypatch.setattr(
+            external_review_module,
+            "run_claude_json",
+            lambda prompt, *, cwd: {
+                "situation_summary": "Claude review fired.",
+                "lab_advice": [{"kind": "direction", "summary": "Try a different backend line."}],
+                "human_advice": [{"kind": "seed_backend_strength", "summary": "Strengthen the seed backend."}],
+                "confidence": 0.82,
+                "evidence_used": ["artifacts/memory/candidate_index.json"],
+            },
+        )
+        result = maybe_request_external_review(candidates_dir, memory_dir, force=True)
+        assert result["status"] == "reviewed"
+        assert result["reviewer"] == "claude"
+        assert result["situation_summary"] == "Claude review fired."
+        assert result["confidence"] == 0.82
+
+    def test_llm_review_falls_back_to_heuristic_on_invalid_payload(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("HARNESS_LAB_LLM_REVIEW_ENABLED", "1")
+        monkeypatch.delenv("HARNESS_LAB_EXTERNAL_REVIEW_COMMAND", raising=False)
+        candidates_dir, memory_dir = self._setup_review_env(tmp_path)
+        monkeypatch.setattr(external_review_module, "run_claude_json", lambda prompt, *, cwd: {"lab_advice": []})
+        result = maybe_request_external_review(candidates_dir, memory_dir, force=True)
+        assert result["status"] == "reviewed"
         assert result["reviewer"] == "heuristic"
 
     def test_idle_when_no_trigger(self, tmp_path, monkeypatch):

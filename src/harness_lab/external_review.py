@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from harness_lab.hindsight import read_hindsight
+from harness_lab.llm import run_claude_json
 from harness_lab.memory import read_json
 from harness_lab.workspace import write_json
 
@@ -166,6 +167,88 @@ def _heuristic_review_payload(index: dict, hindsight: dict, policy: dict, trigge
     }
 
 
+def _llm_review_prompt(index: dict, hindsight: dict, policy: dict, trigger_reason: str, candidate_count: int) -> str:
+    recent_candidates = list(index.get("candidates", []))[-5:]
+    compact_recent = [
+        {
+            "candidate_id": item.get("candidate_id", ""),
+            "outcome_label": item.get("outcome_label", ""),
+            "diagnosis_mechanism": item.get("diagnosis_mechanism", ""),
+            "backend_fingerprints": item.get("backend_fingerprints", []),
+            "benchmark_score": item.get("benchmark_score"),
+            "audit_score": item.get("audit_score"),
+        }
+        for item in recent_candidates
+    ]
+    payload = {
+        "trigger_reason": trigger_reason,
+        "candidate_count": candidate_count,
+        "policy_summary": policy.get("summary", ""),
+        "top_outcomes": hindsight.get("top_outcomes", []),
+        "top_failure_modes": hindsight.get("top_failure_modes", []),
+        "over_explored_mechanisms": hindsight.get("over_explored_mechanisms", []),
+        "under_explored_promising_mechanisms": hindsight.get("under_explored_promising_mechanisms", []),
+        "over_explored_backend_fingerprints": hindsight.get("over_explored_backend_fingerprints", []),
+        "under_explored_backend_fingerprints": hindsight.get("under_explored_backend_fingerprints", []),
+        "recent_candidates": compact_recent,
+    }
+    return (
+        "You are a bounded research peer reviewer for harness-lab.\n"
+        "Return only JSON with keys: situation_summary, lab_advice, human_advice, confidence, evidence_used.\n"
+        "lab_advice and human_advice must be arrays of objects with keys: kind, summary.\n"
+        "lab_advice is allowed to steer only self-evolving search behavior.\n"
+        "human_advice is only for non-self-evolving parts that require human review.\n"
+        "Keep advice concrete, short, and grounded in the supplied evidence.\n\n"
+        f"{json.dumps(payload, indent=2, sort_keys=True)}"
+    )
+
+
+def _normalize_review_payload(payload: dict, reviewer: str) -> dict | None:
+    if not isinstance(payload, dict):
+        return None
+    situation_summary = str(payload.get("situation_summary", "")).strip()
+    confidence = payload.get("confidence", 0.0)
+    try:
+        confidence = float(confidence)
+    except (TypeError, ValueError):
+        confidence = 0.0
+    lab_advice = []
+    for item in payload.get("lab_advice", []):
+        if not isinstance(item, dict):
+            continue
+        summary = str(item.get("summary", "")).strip()
+        kind = str(item.get("kind", "direction")).strip() or "direction"
+        if summary:
+            lab_advice.append({"kind": kind, "summary": summary})
+    human_advice = []
+    for item in payload.get("human_advice", []):
+        if not isinstance(item, dict):
+            continue
+        summary = str(item.get("summary", "")).strip()
+        kind = str(item.get("kind", "non_self_evolving")).strip() or "non_self_evolving"
+        if summary:
+            human_advice.append({"kind": kind, "summary": summary})
+    evidence_used = [str(item) for item in payload.get("evidence_used", []) if str(item).strip()]
+    if not situation_summary:
+        return None
+    return {
+        "reviewer": reviewer,
+        "situation_summary": situation_summary,
+        "lab_advice": lab_advice[:5],
+        "human_advice": human_advice[:5],
+        "confidence": confidence,
+        "evidence_used": evidence_used[:8],
+    }
+
+
+def _run_llm_review(index: dict, hindsight: dict, policy: dict, trigger_reason: str, candidate_count: int, memory_dir: Path) -> dict | None:
+    if str(os.environ.get("HARNESS_LAB_LLM_REVIEW_ENABLED", "")).strip().lower() not in {"1", "true", "yes"}:
+        return None
+    prompt = _llm_review_prompt(index, hindsight, policy, trigger_reason, candidate_count)
+    payload = run_claude_json(prompt, cwd=memory_dir.parent.parent)
+    return _normalize_review_payload(payload, "claude") if payload else None
+
+
 def _run_command_review(memory_dir: Path, trigger_reason: str) -> dict | None:
     command = os.environ.get("HARNESS_LAB_EXTERNAL_REVIEW_COMMAND", "").strip()
     if not command:
@@ -212,6 +295,8 @@ def maybe_request_external_review(candidates_dir: Path, memory_dir: Path, *, for
     )
     if should_review:
         review_payload = (
+            _run_llm_review(index, hindsight, policy, trigger_reason, candidate_count, memory_dir)
+            or
             _run_command_review(memory_dir, trigger_reason)
             or _heuristic_review_payload(index, hindsight, policy, trigger_reason, candidate_count)
         )
