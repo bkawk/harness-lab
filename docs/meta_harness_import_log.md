@@ -23,9 +23,10 @@ This log tracks the main ideas we wanted to absorb from the Meta-Harness artifac
   - rejected keepers are downgraded to dead_end with evidence
   - review artifact written to `outcome/keeper_review.json`
 - higher-value use of bounded external review
-  - `_run_llm_review()` optionally calls an LLM via the Anthropic SDK
-  - configured via `HARNESS_LAB_LLM_REVIEW_MODEL` and `HARNESS_LAB_LLM_REVIEW_API_KEY`
-  - falls back to heuristic review if not configured or if the call fails
+  - `scripts/claude_external_review.sh` invokes Claude Code CLI (`claude -p`) as a command reviewer
+  - configured via `HARNESS_LAB_EXTERNAL_REVIEW_COMMAND=scripts/claude_external_review.sh`
+  - uses the existing `_run_command_review()` path — no API key needed, runs on Claude Code Max plan
+  - falls back to heuristic review if the command is not configured or fails
   - preserves the lab_advice / human_advice split
 - command/runtime throughput accounting
   - `compute_throughput_accounting()` tracks wall-clock, polling overhead, and time saved
