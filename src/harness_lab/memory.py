@@ -32,6 +32,7 @@ class CandidateSummary:
     changed_file_count: int
     trace_count: int
     backend_fingerprints: tuple[str, ...]
+    backend_modules_touched: tuple[str, ...]
     benchmark_score: float | None
     audit_score: float | None
     benchmark_summary: str
@@ -61,6 +62,7 @@ class CandidateSummary:
             "changed_file_count": self.changed_file_count,
             "trace_count": self.trace_count,
             "backend_fingerprints": list(self.backend_fingerprints),
+            "backend_modules_touched": list(self.backend_modules_touched),
             "benchmark_score": self.benchmark_score,
             "audit_score": self.audit_score,
             "benchmark_summary": self.benchmark_summary,
@@ -83,6 +85,7 @@ def summarize_candidate(candidate_root: Path) -> CandidateSummary:
     evidence = [str(item) for item in outcome.get("evidence", [])]
     source_manifest = read_json(source_manifest_path) if source_manifest_path.exists() else {}
     patch_summary = read_json(patch_summary_path) if patch_summary_path.exists() else {}
+    backend_modules_touched = tuple(str(item) for item in patch_summary.get("backend_modules_touched", []))
     hardware_environment = ""
     for item in evidence:
         if item.startswith("hardware:env:"):
@@ -111,6 +114,7 @@ def summarize_candidate(candidate_root: Path) -> CandidateSummary:
         changed_file_count=int(patch_summary.get("changed_file_count", 0) or 0),
         trace_count=len(list((candidate_root / "traces").glob("*"))),
         backend_fingerprints=tuple(str(item) for item in patch_summary.get("backend_fingerprints", [])),
+        backend_modules_touched=backend_modules_touched,
         benchmark_score=benchmark.get("score"),
         audit_score=audit.get("score"),
         benchmark_summary=str(benchmark.get("summary", "")),
@@ -132,6 +136,7 @@ def build_candidate_index(candidates_dir: Path) -> dict:
             "outcome_label_counts": {},
             "hardware_environment_counts": {},
             "backend_fingerprint_counts": {},
+            "backend_module_counts": {},
             "failure_mode_counts": {},
             "observed_failure_mode_counts": {},
             "children_by_parent": {},
@@ -147,6 +152,7 @@ def build_candidate_index(candidates_dir: Path) -> dict:
     outcome_label_counts: Counter[str] = Counter()
     hardware_environment_counts: Counter[str] = Counter()
     backend_fingerprint_counts: Counter[str] = Counter()
+    backend_module_counts: Counter[str] = Counter()
     failure_mode_counts: Counter[str] = Counter()
     observed_failure_mode_counts: Counter[str] = Counter()
     children_by_parent: Counter[str] = Counter()
@@ -172,6 +178,8 @@ def build_candidate_index(candidates_dir: Path) -> dict:
             hardware_environment_counts[summary.hardware_environment] += 1
         for fingerprint in summary.backend_fingerprints:
             backend_fingerprint_counts[fingerprint] += 1
+        for module_name in summary.backend_modules_touched:
+            backend_module_counts[module_name] += 1
         for failure_mode in summary.failure_modes:
             failure_mode_counts[failure_mode] += 1
         for failure_mode in summary.observed_failure_modes:
@@ -190,6 +198,7 @@ def build_candidate_index(candidates_dir: Path) -> dict:
         "outcome_label_counts": dict(sorted(outcome_label_counts.items())),
         "hardware_environment_counts": dict(sorted(hardware_environment_counts.items())),
         "backend_fingerprint_counts": dict(sorted(backend_fingerprint_counts.items())),
+        "backend_module_counts": dict(sorted(backend_module_counts.items())),
         "failure_mode_counts": dict(sorted(failure_mode_counts.items())),
         "observed_failure_mode_counts": dict(sorted(observed_failure_mode_counts.items())),
         "children_by_parent": dict(sorted(children_by_parent.items())),
