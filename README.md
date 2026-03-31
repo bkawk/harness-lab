@@ -29,6 +29,7 @@ If you care about Meta-Harness style systems, this is the important bet:
 - let it explain what it thinks failed
 - let it propose the next move from that evidence
 - let it keep a durable memory of why it changed
+- let the harness reduce wasted uncertainty with stronger bootstrap context, preflight bundles, and live runner visibility
 
 ## Direction
 
@@ -115,7 +116,6 @@ Right now `harness-lab` can:
 - `docs/backend_science_plan.md`
 - `docs/external_review.md`
 - `docs/bootstrap_snapshot.md`
-- `docs/meta_harness_import_log.md`
 
 ## Quick Start
 
