@@ -10,7 +10,7 @@ from pathlib import Path
 log = logging.getLogger("harness_lab.hindsight")
 
 from harness_lab.llm import run_claude_json
-from harness_lab.memory import build_candidate_index
+from harness_lab.memory import build_backend_module_summary, build_candidate_index
 from harness_lab.workspace import write_json
 
 POSITIVE_OUTCOMES = {"keeper", "improved"}
@@ -153,6 +153,8 @@ def _llm_hindsight_prompt(index: dict, heuristic_payload: dict) -> str:
         "under_explored_promising_mechanisms": heuristic_payload.get("under_explored_promising_mechanisms", []),
         "over_explored_backend_fingerprints": heuristic_payload.get("over_explored_backend_fingerprints", []),
         "under_explored_backend_fingerprints": heuristic_payload.get("under_explored_backend_fingerprints", []),
+        "backend_module_notes": heuristic_payload.get("backend_module_notes", []),
+        "backend_module_summary": heuristic_payload.get("backend_module_summary", {}),
         "throughput_summary": heuristic_payload.get("throughput_summary", {}),
         "process_classification_counts": heuristic_payload.get("process_classification_counts", {}),
         "recent_candidates": compact_recent,
@@ -191,6 +193,7 @@ def build_hindsight(candidates_dir: Path) -> dict:
     failure_counts = Counter(index.get("observed_failure_mode_counts", {}))
     mechanism_stats = _mechanism_stats(index)
     backend_fingerprint_stats = _backend_fingerprint_stats(index)
+    backend_module_summary = build_backend_module_summary(candidates_dir)
 
     over_explored: list[dict] = []
     under_explored_promising: list[dict] = []
@@ -251,6 +254,7 @@ def build_hindsight(candidates_dir: Path) -> dict:
 
     hindsight_findings: list[str] = []
     policy_adjustments: list[str] = []
+    backend_module_notes: list[str] = []
 
     dead_end_count = int(outcome_counts.get("dead_end", 0))
     train_error_count = int(outcome_counts.get("train_error", 0))
@@ -295,6 +299,24 @@ def build_hindsight(candidates_dir: Path) -> dict:
         policy_adjustments.append(
             f"Raise priority for backend edits tagged `{under_explored_backend_fingerprints[0]['fingerprint']}`."
         )
+    backend_modules = list(backend_module_summary.get("modules", []))
+    if backend_modules:
+        top_module = backend_modules[0]
+        note = f"Recent backend edits are concentrated in `{top_module['module']}`."
+        if top_module.get("avg_transfer_gap") is not None:
+            note = (
+                f"Recent backend edits are concentrated in `{top_module['module']}`, "
+                f"where the average transfer gap is {float(top_module['avg_transfer_gap']):.6f}."
+            )
+        backend_module_notes.append(note)
+        if int(top_module.get("audit_blocked_count", 0) or 0) >= 2:
+            backend_module_notes.append(
+                f"`{top_module['module']}` changes are still encountering repeated audit-blocked outcomes."
+            )
+        if int(top_module.get("keeper_count", 0) or 0) >= 1:
+            backend_module_notes.append(
+                f"`{top_module['module']}` has already participated in at least one keeper and deserves explicit comparison against other modules."
+            )
 
     # --- Import 2 & 5: aggregate process classification and throughput ---
     process_classification_counts: Counter[str] = Counter()
@@ -354,6 +376,8 @@ def build_hindsight(candidates_dir: Path) -> dict:
         "under_explored_promising_mechanisms": under_explored_promising[:5],
         "over_explored_backend_fingerprints": over_explored_backend_fingerprints[:5],
         "under_explored_backend_fingerprints": under_explored_backend_fingerprints[:5],
+        "backend_module_summary": backend_module_summary,
+        "backend_module_notes": backend_module_notes[:8],
         "mechanism_stats": [item.to_dict() for item in mechanism_stats],
         "backend_fingerprint_stats": backend_fingerprint_stats,
         "process_classification_counts": dict(sorted(process_classification_counts.items())),
@@ -389,6 +413,8 @@ def read_hindsight(memory_dir: Path) -> dict:
             "under_explored_promising_mechanisms": [],
             "over_explored_backend_fingerprints": [],
             "under_explored_backend_fingerprints": [],
+            "backend_module_summary": {},
+            "backend_module_notes": [],
             "mechanism_stats": [],
             "backend_fingerprint_stats": [],
             "process_classification_counts": {},
