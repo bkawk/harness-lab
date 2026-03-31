@@ -20,6 +20,7 @@ from harness_lab.memory import (
     write_science_debug_summary,
     write_science_summary,
 )
+from harness_lab.mutation_brief import write_mutation_brief
 from harness_lab.policy import read_policy, write_policy
 from harness_lab.workspace import write_json
 
@@ -400,6 +401,7 @@ def refresh_memory_artifacts(candidates_dir: Path, memory_dir: Path) -> dict:
     write_backend_module_summary(candidates_dir, memory_dir / "backend_module_summary.json")
     write_hindsight(candidates_dir, memory_dir / "hindsight.json")
     write_policy(candidates_dir, memory_dir, memory_dir / "policy.json")
+    write_mutation_brief(candidates_dir, memory_dir)
     write_budget(memory_dir, memory_dir / "budget.json")
     write_diversity(candidates_dir, memory_dir / "diversity.json")
     synthesize_payload = synthesize_parent_candidates(candidates_dir, memory_dir / "parent_synthesis.json")

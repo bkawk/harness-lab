@@ -13,6 +13,7 @@ from harness_lab.external_review import maybe_request_external_review, read_exte
 from harness_lab.human_feedback import read_human_feedback, read_human_feedback_responses, write_human_feedback
 from harness_lab.hindsight import write_hindsight
 from harness_lab.memory import build_candidate_index
+from harness_lab.mutation_brief import render_next_change_markdown, write_mutation_brief
 from harness_lab.orchestrator import GENESIS_CANDIDATE_ID, LabStepResult, next_candidate_id, run_lab_step
 from harness_lab.policy import read_policy, write_policy
 from harness_lab.publisher import publish_repo_snapshot
@@ -103,11 +104,13 @@ def render_big_bang_markdown(
         write_backend_profile(memory_dir)
         write_policy(candidates_dir, memory_dir, memory_dir / "policy.json")
         write_human_feedback(memory_dir, memory_dir / "human_feedback.json")
+        write_mutation_brief(candidates_dir, memory_dir)
         write_budget(memory_dir, budget_path)
         write_diversity(candidates_dir, diversity_path)
         from harness_lab.memory import write_science_summary
 
         write_science_summary(candidates_dir, science_summary_path)
+        render_next_change_markdown(repo_dir, memory_dir)
     if hindsight_path.exists():
         hindsight = json.loads(hindsight_path.read_text(encoding="utf-8"))
     policy_path = memory_dir / "policy.json"

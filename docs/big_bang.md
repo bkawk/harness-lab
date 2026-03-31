@@ -5,19 +5,19 @@ The GitHub repo is the lab dashboard.
 ## State
 - status: `running`
 - vital_spark_at: `2026-03-31T10:12:12+00:00`
-- started_at: `2026-03-31T20:18:57+00:00`
-- last_heartbeat: `2026-03-31T20:24:25+00:00`
-- cycles_completed: `10`
+- started_at: `2026-03-31T20:25:04+00:00`
+- last_heartbeat: `2026-03-31T20:35:07+00:00`
+- cycles_completed: `1`
 - genesis seed: `cand_0001`
-- last candidate: `cand_0141`
+- last candidate: `cand_0143`
 - last dataset: `abc_boundary512`
 - last commit: `-`
 - last publish message: `Publishing skipped.`
 - last cycle mode: `novelty_cycle`
-- novelty cycles triggered: `10`
+- novelty cycles triggered: `1`
 
 ## Latest Step
-- candidate: `cand_0141`
+- candidate: `cand_0143`
 - dataset: `abc_boundary512` via `reused_prepared_dataset`
 - seed action: `existing`
 - proposal status: `candidate`
@@ -37,11 +37,11 @@ The GitHub repo is the lab dashboard.
 - backend_poll_interval_seconds: `-`
 
 ## Recent Candidates
+- `cand_0143`: outcome `audit_blocked`; diagnosis `complete`; benchmark `0.3492117521528211`
+- `cand_0142`: outcome `-`; diagnosis `empty`; benchmark `None`
 - `cand_0141`: outcome `audit_blocked`; diagnosis `complete`; benchmark `0.29`
 - `cand_0140`: outcome `audit_blocked`; diagnosis `complete`; benchmark `0.317`
 - `cand_0139`: outcome `audit_blocked`; diagnosis `complete`; benchmark `0.292`
-- `cand_0138`: outcome `audit_blocked`; diagnosis `complete`; benchmark `0.326`
-- `cand_0137`: outcome `audit_blocked`; diagnosis `complete`; benchmark `0.409`
 
 ## Science Leaders
 - best benchmark: `cand_0103` -> `0.448`
@@ -50,18 +50,17 @@ The GitHub repo is the lab dashboard.
 - best stable: `cand_0009` -> audit `0.3292391423260943`
 
 ## Science Trend
-- summary: `Across the last 5 scored candidates, benchmark averaged 0.326800, audit averaged 0.295200, and the mean transfer gap was 0.031600.`
-- recent benchmark avg: `0.3268`
-- recent audit avg: `0.2952`
-- recent transfer gap avg: `0.031599999999999996`
+- summary: `Across the last 4 scored candidates, benchmark averaged 0.312053, audit averaged 0.276717, and the mean transfer gap was 0.035336.`
+- recent benchmark avg: `0.3120529380382053`
+- recent audit avg: `0.27671700338009597`
+- recent transfer gap avg: `0.035335934658109316`
+- `cand_0143`: benchmark `0.3492117521528211`, audit `0.3083680135203838`, gap `0.04084373863243729`
 - `cand_0141`: benchmark `0.29`, audit `0.2595`, gap `0.03049999999999997`
 - `cand_0140`: benchmark `0.317`, audit `0.2835`, gap `0.03350000000000003`
 - `cand_0139`: benchmark `0.292`, audit `0.2555`, gap `0.03649999999999998`
-- `cand_0138`: benchmark `0.326`, audit `0.297`, gap `0.029000000000000026`
-- `cand_0137`: benchmark `0.409`, audit `0.3805`, gap `0.02849999999999997`
 
 ## Hindsight
-- summary: `The lab saw 63 audit-blocked outcomes; it should have emphasized transfer-stability checks earlier.`
+- summary: `The lab saw 64 audit-blocked outcomes; it should have emphasized transfer-stability checks earlier.`
 - adjustment: `Raise priority for proposals that directly target transfer stability after an audit_blocked result.`
 
 ## Policy
@@ -84,8 +83,8 @@ The GitHub repo is the lab dashboard.
 - command_backend_configured: `True`
 
 ## External Review
-- status: `cooldown`
-- trigger_reason: `repeated_audit_blocked`
+- status: `idle`
+- trigger_reason: `-`
 - reviewer: `none`
 - summary: `No external review yet.`
 - lab advice: `No live external advice.`
