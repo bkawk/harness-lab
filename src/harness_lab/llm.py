@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import signal
 import subprocess
 from pathlib import Path
 
@@ -33,28 +34,45 @@ def run_claude_json(prompt: str, *, cwd: Path) -> dict | None:
     timeout = int(os.environ.get("HARNESS_LAB_LLM_TIMEOUT_SECONDS", "120") or 120)
     args = [claude_bin, "-p", prompt]
     try:
-        completed = subprocess.run(
+        process = subprocess.Popen(
             args,
             cwd=str(cwd),
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            timeout=timeout,
+            start_new_session=True,
         )
-    except subprocess.TimeoutExpired:
-        log.warning("claude call timed out after %ds", timeout)
-        return None
+        try:
+            stdout, stderr = process.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            log.warning("claude call timed out after %ds", timeout)
+            try:
+                os.killpg(process.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+            try:
+                stdout, stderr = process.communicate(timeout=5)
+            except subprocess.TimeoutExpired:
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                stdout, stderr = process.communicate()
+            return None
     except OSError as exc:
         log.warning("claude binary not found or not executable: %s", exc)
         return None
     except subprocess.SubprocessError as exc:
         log.warning("claude subprocess error: %s", exc)
         return None
-    if completed.returncode != 0:
-        stderr_snippet = (completed.stderr or "").strip()[:200]
-        log.warning("claude exited %d: %s", completed.returncode, stderr_snippet)
+    if process.returncode != 0:
+        stderr_snippet = (stderr or "").strip()[:200]
+        stdout_snippet = (stdout or "").strip()[:200]
+        detail = stderr_snippet or stdout_snippet
+        log.warning("claude exited %d: %s", process.returncode, detail)
         return None
-    result = _extract_json_object(completed.stdout)
+    result = _extract_json_object(stdout)
     if result is None:
-        stdout_snippet = (completed.stdout or "").strip()[:200]
+        stdout_snippet = (stdout or "").strip()[:200]
         log.warning("claude returned non-JSON output: %s", stdout_snippet)
     return result
