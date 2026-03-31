@@ -52,6 +52,8 @@ PYTHONPATH=src python3 scripts/big_bang.py \
 - rewrite a tracked status page under `docs/`
 - publish the new lab state to GitHub
 
+While a backend run is still in flight, `docs/big_bang.md` now also shows an `Active Backend` section sourced from the candidate's live runner trace. That makes the repo dashboard reflect in-progress science work instead of only completed cycles.
+
 The first time `big-bang` enters `running`, the lab records `vital_spark_at` in `artifacts/memory/big_bang_state.json` and surfaces it in `docs/big_bang.md`.
 
 For a real Ubuntu-style long-running process, use the control wrapper:

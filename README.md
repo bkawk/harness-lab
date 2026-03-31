@@ -79,6 +79,7 @@ Right now `harness-lab` can:
 - consult the dataset registry before execution
 - push tracked source/docs evolution to GitHub in a controlled way
 - run a long-lived `big-bang` supervisor that seeds, evolves, and republishes the lab state
+- surface live backend polling state in the repo dashboard while science is still running
 
 ## Initial docs
 

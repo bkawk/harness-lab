@@ -12,7 +12,7 @@ from harness_lab.diversity import read_diversity, write_diversity
 from harness_lab.external_review import maybe_request_external_review, read_external_review
 from harness_lab.hindsight import write_hindsight
 from harness_lab.memory import build_candidate_index
-from harness_lab.orchestrator import GENESIS_CANDIDATE_ID, LabStepResult, run_lab_step
+from harness_lab.orchestrator import GENESIS_CANDIDATE_ID, LabStepResult, next_candidate_id, run_lab_step
 from harness_lab.policy import read_policy, write_policy
 from harness_lab.publisher import publish_repo_snapshot
 from harness_lab.workspace import write_json
@@ -43,6 +43,8 @@ def load_big_bang_state(memory_dir: Path) -> dict:
             "last_publish_message": "",
             "last_cycle_mode": "",
             "novelty_cycles_triggered": 0,
+            "active_candidate_id": "",
+            "active_candidate_started_at": "",
         }
     return json.loads(path.read_text(encoding="utf-8"))
 
@@ -92,6 +94,7 @@ def render_big_bang_markdown(
     backend = {}
     external_review = {}
     science_summary = {}
+    live_command = {}
     if candidates_dir.exists():
         write_hindsight(candidates_dir, hindsight_path)
         write_backend_profile(memory_dir)
@@ -115,6 +118,11 @@ def render_big_bang_markdown(
     external_review = read_external_review(memory_dir)
     if science_summary_path.exists():
         science_summary = json.loads(science_summary_path.read_text(encoding="utf-8"))
+    active_candidate_id = str(state.get("active_candidate_id", "") or "")
+    if active_candidate_id:
+        live_command_path = candidates_dir / active_candidate_id / "traces" / "live_command.json"
+        if live_command_path.exists():
+            live_command = json.loads(live_command_path.read_text(encoding="utf-8"))
     external_lab_lines = [
         f"- lab advice: `{str(item.get('summary', '')).strip()}`"
         for item in external_review.get("lab_advice", [])[:3]
@@ -213,6 +221,14 @@ def render_big_bang_markdown(
             "",
             "## Latest Step",
             *latest_lines,
+            "",
+            "## Active Backend",
+            f"- active_candidate: `{active_candidate_id or '-'}`",
+            f"- backend_status: `{live_command.get('status', '-')}`",
+            f"- backend_pid: `{live_command.get('pid', '-')}`",
+            f"- backend_started_at: `{live_command.get('started_at', '-')}`",
+            f"- backend_last_poll_at: `{live_command.get('last_poll_at', '-')}`",
+            f"- backend_poll_interval_seconds: `{live_command.get('poll_interval_seconds', '-')}`",
             "",
             "## Recent Candidates",
             *recent_lines,
@@ -314,6 +330,16 @@ def run_big_bang(
             update_big_bang_state(memory_dir, status="running", last_heartbeat=heartbeat)
             diversity = read_diversity(memory_dir)
             cycle_mode = "novelty_cycle" if bool(diversity.get("novelty_step_recommended")) else "normal_cycle"
+            candidate_id = next_candidate_id(candidates_dir)
+            update_big_bang_state(
+                memory_dir,
+                status="running",
+                last_heartbeat=utc_now(),
+                active_candidate_id=candidate_id,
+                active_candidate_started_at=utc_now(),
+                last_cycle_mode=cycle_mode,
+            )
+            render_big_bang_markdown(repo_dir, candidates_dir, memory_dir, latest_result)
             latest_result = run_lab_step(
                 repo_dir=repo_dir,
                 candidates_dir=candidates_dir,
@@ -328,6 +354,7 @@ def run_big_bang(
                 shard_size=shard_size,
                 seed=seed,
                 workers=workers,
+                candidate_id=candidate_id,
                 finalize_outcome=True,
                 simulate_outcome=True,
                 runner_backend=runner_backend,
@@ -353,6 +380,8 @@ def run_big_bang(
                 novelty_cycles_triggered=novelty_cycles_triggered,
                 last_external_review_status=review.get("status", ""),
                 last_external_review_reason=review.get("trigger_reason", ""),
+                active_candidate_id="",
+                active_candidate_started_at="",
             )
             render_big_bang_markdown(repo_dir, candidates_dir, memory_dir, latest_result)
             policy = read_policy(memory_dir)
