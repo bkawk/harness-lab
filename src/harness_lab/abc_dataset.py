@@ -397,6 +397,87 @@ def stack_samples(samples: list[Sample]) -> dict[str, np.ndarray]:
     }
 
 
+def sample_profile(sample: Sample) -> dict[str, float]:
+    labels = sample.labels.astype(np.int64, copy=False)
+    unique_labels = np.unique(labels)
+    boundary_rate = float(sample.boundary.mean())
+    rare_ratio = float(np.mean(labels == 4))
+    instance_ratio = float(np.mean(sample.instance_ids >= 0))
+    complexity = (
+        (boundary_rate * 0.45)
+        + (rare_ratio * 0.3)
+        + (min(len(unique_labels), len(CLASS_NAMES)) / len(CLASS_NAMES) * 0.15)
+        + (instance_ratio * 0.1)
+    )
+    return {
+        "boundary_rate": boundary_rate,
+        "rare_ratio": rare_ratio,
+        "instance_ratio": instance_ratio,
+        "unique_class_count": float(len(unique_labels)),
+        "difficulty_score": float(complexity),
+    }
+
+
+def build_eval_slices(val_samples: list[Sample]) -> dict[str, object]:
+    count = len(val_samples)
+    if count == 0:
+        return {
+            "strategy": "empty",
+            "slices": {},
+            "profiles": [],
+        }
+
+    profiles = []
+    for idx, sample in enumerate(val_samples):
+        profile = sample_profile(sample)
+        profile["index"] = idx
+        profiles.append(profile)
+
+    ranked = sorted(profiles, key=lambda item: (float(item["difficulty_score"]), float(item["boundary_rate"]), int(item["index"])))
+    benchmark_idx = [int(item["index"]) for pos, item in enumerate(ranked) if pos % 3 == 0]
+    smoke_idx = [int(item["index"]) for pos, item in enumerate(ranked) if pos % 3 == 1]
+    audit_idx = [int(item["index"]) for pos, item in enumerate(ranked) if pos % 3 == 2]
+
+    if not smoke_idx:
+        smoke_idx = list(benchmark_idx)
+    if not audit_idx:
+        audit_idx = list(smoke_idx)
+
+    top_boundary = sorted(profiles, key=lambda item: (-float(item["boundary_rate"]), int(item["index"])))
+    top_transfer = sorted(profiles, key=lambda item: (-float(item["difficulty_score"]), int(item["index"])))
+    focus_count = max(1, min(count, max(2, count // 4)))
+
+    def summarize(indices: list[int]) -> dict[str, object]:
+        selected = [profiles[idx] for idx in indices]
+        if not selected:
+            return {"count": 0}
+        return {
+            "count": len(indices),
+            "avg_boundary_rate": float(sum(float(item["boundary_rate"]) for item in selected) / len(selected)),
+            "avg_difficulty_score": float(sum(float(item["difficulty_score"]) for item in selected) / len(selected)),
+            "avg_rare_ratio": float(sum(float(item["rare_ratio"]) for item in selected) / len(selected)),
+        }
+
+    slices = {
+        "benchmark": {"indices": benchmark_idx, "summary": summarize(benchmark_idx)},
+        "transfer_smoke": {"indices": smoke_idx, "summary": summarize(smoke_idx)},
+        "audit": {"indices": audit_idx, "summary": summarize(audit_idx)},
+        "audit_boundary": {
+            "indices": [int(item["index"]) for item in top_boundary[:focus_count]],
+            "summary": summarize([int(item["index"]) for item in top_boundary[:focus_count]]),
+        },
+        "audit_transfer": {
+            "indices": [int(item["index"]) for item in top_transfer[:focus_count]],
+            "summary": summarize([int(item["index"]) for item in top_transfer[:focus_count]]),
+        },
+    }
+    return {
+        "strategy": "difficulty_stratified_round_robin",
+        "slices": slices,
+        "profiles": profiles,
+    }
+
+
 def save_shards(split: str, samples: list[Sample], data_dir: Path, shard_size: int) -> list[dict[str, object]]:
     shard_entries = []
     buffer: list[Sample] = []
@@ -416,7 +497,13 @@ def save_shards(split: str, samples: list[Sample], data_dir: Path, shard_size: i
     return shard_entries
 
 
-def compute_metadata(data_dir: Path, num_points: int, description: str) -> dict[str, object]:
+def compute_metadata(
+    data_dir: Path,
+    num_points: int,
+    description: str,
+    *,
+    eval_slices: dict | None = None,
+) -> dict[str, object]:
     split_entries = {}
     class_counts = np.zeros(len(CLASS_NAMES), dtype=np.int64)
     param_sum_sq = np.zeros(PARAM_DIM, dtype=np.float64)
@@ -446,6 +533,7 @@ def compute_metadata(data_dir: Path, num_points: int, description: str) -> dict[
         "splits": split_entries,
         "class_counts": class_counts.tolist(),
         "param_scale": param_scale.astype(np.float32).tolist(),
+        "eval_slices": eval_slices or {},
     }
 
 
@@ -478,9 +566,15 @@ def build_packed_dataset(*, input_dir: Path, output_dir: Path, num_points: int, 
     rng = np.random.default_rng(seed)
     train_samples = [load_external_sample(path, num_points, rng) for path in train_files]
     val_samples = [load_external_sample(path, num_points, rng) for path in val_files]
+    eval_slices = build_eval_slices(val_samples)
     save_shards("train", train_samples, output_dir, shard_size)
     save_shards("val", val_samples, output_dir, shard_size)
-    metadata = compute_metadata(output_dir, num_points, "Prepared ABC mesh-to-parametric training shards")
+    metadata = compute_metadata(
+        output_dir,
+        num_points,
+        "Prepared ABC mesh-to-parametric training shards",
+        eval_slices=eval_slices,
+    )
     write_json(output_dir / "metadata.json", metadata)
     return metadata
 

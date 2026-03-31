@@ -127,6 +127,23 @@ def make_eval_splits(dataset_root: Path) -> tuple[Dataset, Dataset]:
 
 def make_transfer_eval_splits(dataset_root: Path) -> tuple[Dataset, Dataset, Dataset]:
     val_dataset = PackedShardDataset(dataset_root, "val")
+    metadata = load_metadata(dataset_root)
+    eval_slices = metadata.get("eval_slices", {}) if isinstance(metadata, dict) else {}
+    slice_map = eval_slices.get("slices", {}) if isinstance(eval_slices, dict) else {}
+    if isinstance(slice_map, dict) and slice_map:
+        def _subset(name: str) -> Dataset | None:
+            payload = slice_map.get(name, {})
+            indices = [int(i) for i in payload.get("indices", []) if 0 <= int(i) < len(val_dataset)]
+            if not indices:
+                return None
+            return Subset(val_dataset, indices)
+
+        benchmark = _subset("benchmark")
+        smoke = _subset("transfer_smoke")
+        audit = _subset("audit")
+        if benchmark is not None and smoke is not None and audit is not None:
+            return benchmark, smoke, audit
+
     count = len(val_dataset)
     if count < 3:
         return val_dataset, val_dataset, val_dataset

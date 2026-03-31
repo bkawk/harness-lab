@@ -75,6 +75,9 @@ def prepared_dataset_quality(record: dict) -> dict:
         or sum(int(entry.get("num_samples", 0) or 0) for entry in splits.get("val", []))
     )
     num_points = int(metadata.get("num_points", 0) or 0)
+    eval_slices = metadata.get("eval_slices", {}) if isinstance(metadata, dict) else {}
+    slice_map = eval_slices.get("slices", {}) if isinstance(eval_slices, dict) else {}
+    named_eval_slices = len(slice_map) if isinstance(slice_map, dict) else 0
     score = 0
     if train_samples > 0:
         score += min(train_samples, 4096)
@@ -84,6 +87,8 @@ def prepared_dataset_quality(record: dict) -> dict:
         score += min(num_points // 4, 1024)
     if build_manifest:
         score += 256
+    if named_eval_slices >= 3:
+        score += 384
     if val_samples >= 16:
         score += 512
     if val_samples >= 64:
@@ -93,6 +98,7 @@ def prepared_dataset_quality(record: dict) -> dict:
         "train_samples": train_samples,
         "val_samples": val_samples,
         "num_points": num_points,
+        "named_eval_slices": named_eval_slices,
         "has_build_manifest": bool(build_manifest),
         "score": score,
     }
