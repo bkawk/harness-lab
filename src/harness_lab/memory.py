@@ -31,6 +31,7 @@ class CandidateSummary:
     snapshot_file_count: int
     changed_file_count: int
     trace_count: int
+    backend_fingerprints: tuple[str, ...]
     benchmark_score: float | None
     audit_score: float | None
     benchmark_summary: str
@@ -59,6 +60,7 @@ class CandidateSummary:
             "snapshot_file_count": self.snapshot_file_count,
             "changed_file_count": self.changed_file_count,
             "trace_count": self.trace_count,
+            "backend_fingerprints": list(self.backend_fingerprints),
             "benchmark_score": self.benchmark_score,
             "audit_score": self.audit_score,
             "benchmark_summary": self.benchmark_summary,
@@ -108,6 +110,7 @@ def summarize_candidate(candidate_root: Path) -> CandidateSummary:
         snapshot_file_count=int(source_manifest.get("tracked_file_count", 0) or 0),
         changed_file_count=int(patch_summary.get("changed_file_count", 0) or 0),
         trace_count=len(list((candidate_root / "traces").glob("*"))),
+        backend_fingerprints=tuple(str(item) for item in patch_summary.get("backend_fingerprints", [])),
         benchmark_score=benchmark.get("score"),
         audit_score=audit.get("score"),
         benchmark_summary=str(benchmark.get("summary", "")),
@@ -128,6 +131,7 @@ def build_candidate_index(candidates_dir: Path) -> dict:
             "outcome_status_counts": {},
             "outcome_label_counts": {},
             "hardware_environment_counts": {},
+            "backend_fingerprint_counts": {},
             "failure_mode_counts": {},
             "observed_failure_mode_counts": {},
             "children_by_parent": {},
@@ -142,6 +146,7 @@ def build_candidate_index(candidates_dir: Path) -> dict:
     outcome_status_counts: Counter[str] = Counter()
     outcome_label_counts: Counter[str] = Counter()
     hardware_environment_counts: Counter[str] = Counter()
+    backend_fingerprint_counts: Counter[str] = Counter()
     failure_mode_counts: Counter[str] = Counter()
     observed_failure_mode_counts: Counter[str] = Counter()
     children_by_parent: Counter[str] = Counter()
@@ -165,6 +170,8 @@ def build_candidate_index(candidates_dir: Path) -> dict:
             outcome_label_counts[summary.outcome_label] += 1
         if summary.hardware_environment:
             hardware_environment_counts[summary.hardware_environment] += 1
+        for fingerprint in summary.backend_fingerprints:
+            backend_fingerprint_counts[fingerprint] += 1
         for failure_mode in summary.failure_modes:
             failure_mode_counts[failure_mode] += 1
         for failure_mode in summary.observed_failure_modes:
@@ -182,6 +189,7 @@ def build_candidate_index(candidates_dir: Path) -> dict:
         "outcome_status_counts": dict(sorted(outcome_status_counts.items())),
         "outcome_label_counts": dict(sorted(outcome_label_counts.items())),
         "hardware_environment_counts": dict(sorted(hardware_environment_counts.items())),
+        "backend_fingerprint_counts": dict(sorted(backend_fingerprint_counts.items())),
         "failure_mode_counts": dict(sorted(failure_mode_counts.items())),
         "observed_failure_mode_counts": dict(sorted(observed_failure_mode_counts.items())),
         "children_by_parent": dict(sorted(children_by_parent.items())),

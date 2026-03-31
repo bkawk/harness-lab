@@ -105,6 +105,25 @@ def _load_snapshot_file(candidate_root: Path, relative_path: str) -> list[str]:
     return path.read_text(encoding="utf-8").splitlines(keepends=True)
 
 
+def _science_backend_fingerprints(relative_path: str, parent_lines: list[str], child_lines: list[str]) -> list[str]:
+    if relative_path != "src/harness_lab/science_backend.py":
+        return []
+    joined = "".join(parent_lines) + "\n" + "".join(child_lines)
+    fingerprints: list[str] = []
+    checks = {
+        "local_encoder_changed": ("knn_indices", "local_mlp", "gather_neighbors"),
+        "fusion_changed": ("global_proj", "local_feat", "fused = torch.cat"),
+        "instance_path_changed": ("instance_head", "instance_class_proj", "instance_modulation_scale"),
+        "loss_recipe_changed": ("compute_loss", "boundary_loss_weight", "instance_loss_weight", "param_loss_weight"),
+        "outcome_classifier_changed": ("classify_outcome", "transfer_collapse", "weak_boundary_f1", "transfer_win"),
+        "budget_policy_changed": ("time_budget_seconds", "budget_choices", "HARNESS_LAB_SCIENCE_TIME_BUDGET_SECONDS"),
+    }
+    for label, needles in checks.items():
+        if any(needle in joined for needle in needles):
+            fingerprints.append(label)
+    return fingerprints
+
+
 @dataclass(frozen=True)
 class EvidenceCapture:
     snapshot_manifest: Path
@@ -128,6 +147,7 @@ def capture_candidate_evidence(
     combined_patch_path = candidate_root / "patches" / "against_parent.patch"
     changed_files: list[str] = []
     patch_chunks: list[str] = []
+    backend_fingerprints: set[str] = set()
 
     if parent_id:
         parent_root = candidates_dir / parent_id
@@ -141,6 +161,7 @@ def capture_candidate_evidence(
             if parent_lines == child_lines:
                 continue
             changed_files.append(relative_path)
+            backend_fingerprints.update(_science_backend_fingerprints(relative_path, parent_lines, child_lines))
             diff = difflib.unified_diff(
                 parent_lines,
                 child_lines,
@@ -158,6 +179,7 @@ def capture_candidate_evidence(
             "captured_at": utc_now(),
             "changed_files": changed_files,
             "changed_file_count": len(changed_files),
+            "backend_fingerprints": sorted(backend_fingerprints),
             "combined_patch": str(combined_patch_path.relative_to(candidate_root)),
         },
     )
