@@ -47,6 +47,10 @@ def run_science_backend(
     trace_dir.mkdir(parents=True, exist_ok=True)
     write_science_progress(trace_dir, "initializing", candidate_id=candidate_id)
     cfg = derive_config(candidate_id, proposal, diagnosis)
+    (trace_dir / "backend_levers.json").write_text(
+        json.dumps(proposal.get("backend_levers", {}), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     metadata = load_metadata(dataset_root)
     spec = get_dataset_spec(dataset_root)
     device = get_device()

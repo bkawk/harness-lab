@@ -69,6 +69,10 @@ def test_llm_proposal_can_author_draft(tmp_path, monkeypatch):
                     "summary": "Favor a smaller transfer-stability move instead of a broad architecture jump.",
                 }
             ],
+            "backend_levers": {
+                "science_model": {"hidden_dim": 160, "k_neighbors": 10},
+                "science_eval": {"transfer_smoke_max_gap": 0.025},
+            },
         },
     )
     monkeypatch.setattr(proposal_module, "choose_best_prepared_dataset", lambda memory_dir: {"dataset_id": "abc_boundary512_v64"})
@@ -85,6 +89,8 @@ def test_llm_proposal_can_author_draft(tmp_path, monkeypatch):
     assert draft.rationale == "Claude wants a tighter transfer-stability follow-up."
     assert draft.target["harness_component"] == "transfer_guard"
     assert draft.changes[0]["kind"] == "llm_priority"
+    assert draft.backend_levers["science_model"]["hidden_dim"] == 160
+    assert draft.backend_levers["science_eval"]["transfer_smoke_max_gap"] == 0.025
 
 
 def test_invalid_llm_proposal_falls_back_to_heuristic(tmp_path, monkeypatch):

@@ -51,6 +51,66 @@ def deterministic_index(text: str, modulo: int) -> int:
     return _deterministic_index(text, modulo)
 
 
+def _clamp_int(value: object, minimum: int, maximum: int) -> int | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return max(minimum, min(maximum, int(value)))
+
+
+def _clamp_float(value: object, minimum: float, maximum: float) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return max(minimum, min(maximum, float(value)))
+
+
+def _apply_backend_levers(cfg: ScienceConfig, proposal: dict) -> ScienceConfig:
+    lever_groups = proposal.get("backend_levers", {})
+    if not isinstance(lever_groups, dict):
+        return cfg
+    values = asdict(cfg)
+    applied = False
+    int_specs = {
+        "hidden_dim": (64, 192),
+        "global_dim": (96, 320),
+        "instance_dim": (8, 32),
+        "k_neighbors": (4, 16),
+        "batch_size": (1, 4),
+        "eval_batch_size": (1, 4),
+        "log_interval": (5, 100),
+        "time_budget_seconds": (300, 900),
+        "eval_reserve_seconds": (60, 240),
+    }
+    float_specs = {
+        "instance_modulation_scale": (0.0, 0.25),
+        "param_loss_weight": (0.05, 0.5),
+        "boundary_loss_weight": (0.01, 0.3),
+        "instance_loss_weight": (0.0, 0.15),
+        "instance_margin": (0.1, 0.6),
+        "transfer_smoke_min_score": (0.15, 0.35),
+        "transfer_smoke_max_gap": (0.01, 0.08),
+        "transfer_smoke_min_boundary_f1": (0.05, 0.25),
+        "lr": (1e-4, 6e-4),
+        "weight_decay": (1e-5, 5e-4),
+        "grad_clip": (0.5, 2.0),
+    }
+    for module_name in ("science_model", "science_loss", "science_eval", "science_config", "science_train"):
+        module_levers = lever_groups.get(module_name, {})
+        if not isinstance(module_levers, dict):
+            continue
+        for field, raw in module_levers.items():
+            if field in int_specs:
+                value = _clamp_int(raw, *int_specs[field])
+            elif field in float_specs:
+                value = _clamp_float(raw, *float_specs[field])
+            else:
+                value = None
+            if value is None:
+                continue
+            values[field] = value
+            applied = True
+    return ScienceConfig(**values) if applied else cfg
+
+
 def derive_config(candidate_id: str, proposal: dict, diagnosis: dict) -> ScienceConfig:
     signature = f"{candidate_id}|{_proposal_signature(proposal)}|{diagnosis.get('summary', '')}"
     lr_choices = [2.0e-4, 3.0e-4, 4.0e-4]
@@ -102,6 +162,7 @@ def derive_config(candidate_id: str, proposal: dict, diagnosis: dict) -> Science
                 "k_neighbors": max(cfg.k_neighbors, 8),
             }
         )
+    cfg = _apply_backend_levers(cfg, proposal)
     override = os.environ.get("HARNESS_LAB_SCIENCE_TIME_BUDGET_SECONDS", "").strip()
     if override:
         cfg = ScienceConfig(**{**asdict(cfg), "time_budget_seconds": int(float(override))})

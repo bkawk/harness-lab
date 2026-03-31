@@ -23,3 +23,26 @@ def test_apply_oom_backoff_reduces_pressure():
     assert reduced.instance_dim <= cfg.instance_dim
     assert reduced.k_neighbors <= cfg.k_neighbors
     assert reduced.instance_loss_weight <= cfg.instance_loss_weight
+
+
+def test_derive_config_applies_bounded_backend_levers():
+    cfg = derive_config(
+        "cand_0100",
+        {
+            "target": {},
+            "changes": [],
+            "backend_levers": {
+                "science_model": {"hidden_dim": 999, "k_neighbors": 12},
+                "science_loss": {"instance_loss_weight": 0.12},
+                "science_eval": {"transfer_smoke_max_gap": 0.02},
+                "science_train": {"batch_size": 3},
+            },
+        },
+        {},
+    )
+
+    assert cfg.hidden_dim == 192
+    assert cfg.k_neighbors == 12
+    assert cfg.instance_loss_weight == 0.12
+    assert cfg.transfer_smoke_max_gap == 0.02
+    assert cfg.batch_size == 3

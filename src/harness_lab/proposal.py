@@ -31,6 +31,7 @@ class DraftProposal:
     rationale: str
     target: dict
     changes: tuple[dict, ...]
+    backend_levers: dict
     memory_context: dict
 
     def to_dict(self) -> dict:
@@ -42,6 +43,7 @@ class DraftProposal:
             "rationale": self.rationale,
             "target": self.target,
             "changes": list(self.changes),
+            "backend_levers": self.backend_levers,
             "memory_context": self.memory_context,
         }
 
@@ -439,16 +441,40 @@ def _llm_proposal_prompt(
     }
     return (
         "You are authoring a bounded harness-lab proposal.\n"
-        "Return only JSON with keys: rationale, target, changes.\n"
+        "Return only JSON with keys: rationale, target, changes, backend_levers.\n"
         "target must be an object with keys: harness_component, expected_failure_mode, novelty_basis.\n"
         "changes must be an array of objects with keys: kind, mechanism, summary.\n"
+        "backend_levers is optional. If present, it must be an object keyed by module name from: science_model, science_loss, science_eval, science_config, science_train.\n"
+        "Each module value must be an object of scalar numeric lever values only.\n"
         "Keep the proposal concrete, short, and grounded in the supplied evidence.\n"
         "Do not mutate files or mention implementation details outside the proposal JSON.\n\n"
         f"{json.dumps(payload, indent=2, sort_keys=True)}"
     )
 
 
-def _normalize_llm_proposal_payload(payload: dict, fallback_target: dict, fallback_changes: tuple[dict, ...], fallback_rationale: str) -> tuple[str, dict, tuple[dict, ...]] | None:
+def _normalize_backend_levers(payload: dict) -> dict:
+    if not isinstance(payload, dict):
+        return {}
+    allowed_modules = {"science_model", "science_loss", "science_eval", "science_config", "science_train"}
+    normalized: dict[str, dict[str, float | int]] = {}
+    for module_name, lever_map in payload.items():
+        module_key = str(module_name).strip()
+        if module_key not in allowed_modules or not isinstance(lever_map, dict):
+            continue
+        clean: dict[str, float | int] = {}
+        for lever_name, value in lever_map.items():
+            if isinstance(value, bool):
+                continue
+            if isinstance(value, int):
+                clean[str(lever_name).strip()] = value
+            elif isinstance(value, float):
+                clean[str(lever_name).strip()] = float(value)
+        if clean:
+            normalized[module_key] = clean
+    return normalized
+
+
+def _normalize_llm_proposal_payload(payload: dict, fallback_target: dict, fallback_changes: tuple[dict, ...], fallback_rationale: str) -> tuple[str, dict, tuple[dict, ...], dict] | None:
     if not isinstance(payload, dict):
         return None
     rationale = str(payload.get("rationale", "")).strip()
@@ -478,7 +504,8 @@ def _normalize_llm_proposal_payload(payload: dict, fallback_target: dict, fallba
         target["novelty_basis"] = str(fallback_target.get("novelty_basis", "")).strip()
     if not changes:
         changes = list(fallback_changes)
-    return rationale, target, tuple(changes[:8])
+    backend_levers = _normalize_backend_levers(payload.get("backend_levers", {}))
+    return rationale, target, tuple(changes[:8]), backend_levers
 
 
 def _maybe_llm_author_proposal(
@@ -492,9 +519,10 @@ def _maybe_llm_author_proposal(
     fallback_target: dict,
     fallback_changes: tuple[dict, ...],
     fallback_rationale: str,
-) -> tuple[str, dict, tuple[dict, ...]]:
+    fallback_backend_levers: dict,
+) -> tuple[str, dict, tuple[dict, ...], dict]:
     if str(os.environ.get("HARNESS_LAB_LLM_PROPOSAL_ENABLED", "")).strip().lower() not in {"1", "true", "yes"}:
-        return fallback_rationale, fallback_target, fallback_changes
+        return fallback_rationale, fallback_target, fallback_changes, fallback_backend_levers
     payload = run_claude_json(
         _llm_proposal_prompt(
             bootstrap_snapshot=bootstrap_snapshot,
@@ -511,7 +539,7 @@ def _maybe_llm_author_proposal(
     normalized = _normalize_llm_proposal_payload(payload or {}, fallback_target, fallback_changes, fallback_rationale)
     if not normalized:
         log.warning("proposal: claude fallback to heuristic (payload=%s)", "empty" if not payload else "invalid")
-        return fallback_rationale, fallback_target, fallback_changes
+        return fallback_rationale, fallback_target, fallback_changes, fallback_backend_levers
     log.info("proposal authored by claude")
     return normalized
 
@@ -583,7 +611,7 @@ def draft_proposal_for_candidate(
             "expected_failure_mode": "",
             "novelty_basis": "genesis real-backend baseline with no prior candidate lineage",
         }
-        rationale, target, changes = _maybe_llm_author_proposal(
+        rationale, target, changes, backend_levers = _maybe_llm_author_proposal(
             candidate_root=candidate_root,
             bootstrap_snapshot=bootstrap_snapshot,
             parent_diagnosis={},
@@ -593,6 +621,7 @@ def draft_proposal_for_candidate(
             fallback_target=target,
             fallback_changes=changes,
             fallback_rationale=rationale,
+            fallback_backend_levers={},
         )
         draft = DraftProposal(
             candidate_id=candidate_id,
@@ -602,6 +631,7 @@ def draft_proposal_for_candidate(
             rationale=rationale,
             target=target,
             changes=changes,
+            backend_levers=backend_levers,
             memory_context={
                 "parent_created_at": "",
                 "reference_candidate_ids": [],
@@ -659,7 +689,7 @@ def draft_proposal_for_candidate(
         "expected_failure_mode": failure_modes[0] if failure_modes else str(parent_summary.get("expected_failure_mode", "")).strip(),
         "novelty_basis": _novelty_basis_from_memory(index, parent_summary, parent_diagnosis),
     }
-    rationale, target, changes = _maybe_llm_author_proposal(
+    rationale, target, changes, backend_levers = _maybe_llm_author_proposal(
         candidate_root=candidate_root,
         bootstrap_snapshot=bootstrap_snapshot,
         parent_diagnosis=parent_diagnosis,
@@ -669,6 +699,7 @@ def draft_proposal_for_candidate(
         fallback_target=target,
         fallback_changes=changes,
         fallback_rationale=rationale,
+        fallback_backend_levers={},
     )
     draft = DraftProposal(
         candidate_id=candidate_id,
@@ -678,6 +709,7 @@ def draft_proposal_for_candidate(
         rationale=rationale,
         target=target,
         changes=changes,
+        backend_levers=backend_levers,
         memory_context={
             "parent_created_at": str(parent_workspace.get("created_at", "")),
             "reference_candidate_ids": [chosen_parent],
