@@ -5,19 +5,19 @@ The GitHub repo is the lab dashboard.
 ## State
 - status: `running`
 - vital_spark_at: `2026-03-31T10:12:12+00:00`
-- started_at: `2026-03-31T15:49:29+00:00`
-- last_heartbeat: `2026-03-31T16:18:58+00:00`
-- cycles_completed: `23`
+- started_at: `2026-03-31T16:21:07+00:00`
+- last_heartbeat: `2026-03-31T16:31:07+00:00`
+- cycles_completed: `1`
 - genesis seed: `cand_0001`
-- last candidate: `cand_0066`
+- last candidate: `cand_0068`
 - last dataset: `abc_boundary512`
 - last commit: `-`
 - last publish message: `Publishing skipped.`
 - last cycle mode: `novelty_cycle`
-- novelty cycles triggered: `20`
+- novelty cycles triggered: `1`
 
 ## Latest Step
-- candidate: `cand_0066`
+- candidate: `cand_0068`
 - dataset: `abc_boundary512` via `reused_prepared_dataset`
 - seed action: `existing`
 - proposal status: `candidate`
@@ -37,11 +37,11 @@ The GitHub repo is the lab dashboard.
 - backend_poll_interval_seconds: `-`
 
 ## Recent Candidates
+- `cand_0068`: outcome `stalled`; diagnosis `complete`; benchmark `None`
+- `cand_0067`: outcome `-`; diagnosis `empty`; benchmark `None`
 - `cand_0066`: outcome `stalled`; diagnosis `complete`; benchmark `None`
 - `cand_0065`: outcome `stalled`; diagnosis `complete`; benchmark `None`
 - `cand_0064`: outcome `stalled`; diagnosis `complete`; benchmark `None`
-- `cand_0063`: outcome `stalled`; diagnosis `complete`; benchmark `None`
-- `cand_0062`: outcome `stalled`; diagnosis `complete`; benchmark `None`
 
 ## Science Leaders
 - best benchmark: `cand_0013` -> `0.3847249926656351`
@@ -89,9 +89,9 @@ The GitHub repo is the lab dashboard.
 
 ## What The Lab Wants
 - summary: `The lab has 3 ranked requests for human help.`
+- [12] `evaluation`: `Improve transfer-stability evaluation or smoke tests so promising candidates fail earlier before full audit.`
+- [9] `ops`: `Harden backend startup and completion reporting so stalled candidates stop consuming full budget.`
 - [7] `dataset`: `Consider improving the validation split or transfer-oriented data slices so the lab can distinguish local wins from robust gains sooner.`
-- [6] `evaluation`: `Improve transfer-stability evaluation or smoke tests so promising candidates fail earlier before full audit.`
-- [4] `ops`: `Harden backend startup and completion reporting so stalled candidates stop consuming full budget.`
 
 ## What We Did
 - summary: `The humans recently addressed 3 lab request(s).`
