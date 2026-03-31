@@ -155,10 +155,13 @@ def evaluate_model(
     total_confusion = torch.zeros((num_classes, num_classes), dtype=accum_dtype, device=device)
     total_sq_error = torch.zeros(1, dtype=accum_dtype, device=device)
     total_param_count = torch.zeros(1, dtype=accum_dtype, device=device)
+    boundary_tp = torch.zeros(1, dtype=accum_dtype, device=device)
+    boundary_fp = torch.zeros(1, dtype=accum_dtype, device=device)
+    boundary_fn = torch.zeros(1, dtype=accum_dtype, device=device)
 
     for batch in dataloader:
         batch = move_batch_to_device(batch, device)
-        logits, param_pred, _, _ = model(batch["points"], batch["normals"])
+        logits, param_pred, boundary_logits, _ = model(batch["points"], batch["normals"])
         pred_labels = logits.argmax(dim=-1)
         total_confusion += confusion_matrix(pred_labels, batch["labels"], num_classes).to(device=device, dtype=accum_dtype)
 
@@ -167,6 +170,11 @@ def evaluate_model(
         masked_sq = diff.square() * batch["param_mask"]
         total_sq_error += masked_sq.sum(dtype=accum_dtype)
         total_param_count += batch["param_mask"].sum(dtype=accum_dtype)
+        boundary_pred = torch.sigmoid(boundary_logits) >= 0.5
+        boundary_target = batch["boundary"] >= 0.5
+        boundary_tp += (boundary_pred & boundary_target).sum(dtype=accum_dtype)
+        boundary_fp += (boundary_pred & ~boundary_target).sum(dtype=accum_dtype)
+        boundary_fn += (~boundary_pred & boundary_target).sum(dtype=accum_dtype)
 
     intersection = total_confusion.diag()
     union = total_confusion.sum(dim=1) + total_confusion.sum(dim=0) - intersection
@@ -178,10 +186,21 @@ def evaluate_model(
     denom = torch.clamp(total_param_count, min=1.0)
     param_rmse_norm = float(torch.sqrt(total_sq_error / denom).item())
     param_score = 1.0 / (1.0 + param_rmse_norm)
+    boundary_precision = float((boundary_tp / torch.clamp(boundary_tp + boundary_fp, min=1.0)).item())
+    boundary_recall = float((boundary_tp / torch.clamp(boundary_tp + boundary_fn, min=1.0)).item())
+    boundary_f1 = (
+        2.0 * boundary_precision * boundary_recall / max(boundary_precision + boundary_recall, 1e-8)
+        if (boundary_precision + boundary_recall) > 0.0
+        else 0.0
+    )
     val_score = 0.7 * macro_iou + 0.3 * param_score
     return {
         "val_score": float(val_score),
         "macro_iou": float(macro_iou),
+        "per_class_iou": [float(x) for x in per_class_iou.detach().cpu().tolist()],
         "param_rmse_norm": float(param_rmse_norm),
         "param_score": float(param_score),
+        "boundary_precision": float(boundary_precision),
+        "boundary_recall": float(boundary_recall),
+        "boundary_f1": float(boundary_f1),
     }

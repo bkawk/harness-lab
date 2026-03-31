@@ -297,12 +297,21 @@ def classify_outcome(benchmark_metrics: dict[str, float], audit_metrics: dict[st
     benchmark = float(benchmark_metrics["val_score"])
     audit = float(audit_metrics["val_score"])
     gap = benchmark - audit
+    boundary_f1 = float(audit_metrics.get("boundary_f1", benchmark_metrics.get("boundary_f1", 0.0)))
     if steps < 2:
         return "train_error", ["undertrained"]
     if benchmark >= 0.30 and audit >= benchmark - 0.025:
         return "keeper", []
+    if audit >= 0.28 and audit >= benchmark + 0.01:
+        return "improved", ["transfer_win"]
     if benchmark >= 0.24:
-        return "audit_blocked", ["transfer_regression"] if gap > 0.02 else ["local_only_gain"]
+        if gap > 0.04:
+            return "audit_blocked", ["transfer_collapse"]
+        if gap > 0.02:
+            return "audit_blocked", ["transfer_regression"]
+        return "audit_blocked", ["local_only_gain"]
+    if boundary_f1 < 0.15:
+        return "dead_end", ["weak_boundary_f1"]
     return "dead_end", ["no_gain"]
 
 
@@ -395,6 +404,9 @@ def run_science_backend(
         f"science:train_seconds:{training_seconds:.1f}",
         f"science:benchmark:{benchmark_metrics['val_score']:.6f}",
         f"science:audit:{audit_metrics['val_score']:.6f}",
+        f"science:transfer_gap:{(benchmark_metrics['val_score'] - audit_metrics['val_score']):.6f}",
+        f"science:benchmark_boundary_f1:{benchmark_metrics.get('boundary_f1', 0.0):.6f}",
+        f"science:audit_boundary_f1:{audit_metrics.get('boundary_f1', 0.0):.6f}",
         f"science:train_samples:{len(train_dataset)}",
         f"science:val_benchmark_samples:{len(benchmark_dataset)}",
         f"science:val_audit_samples:{len(audit_dataset)}",
@@ -407,6 +419,7 @@ def run_science_backend(
             {
                 "benchmark_metrics": benchmark_metrics,
                 "audit_metrics": audit_metrics,
+                "benchmark_audit_gap": float(benchmark_metrics["val_score"] - audit_metrics["val_score"]),
                 "training_seconds": training_seconds,
                 "steps": steps,
                 "peak_vram_mb": peak_vram_mb(device),
