@@ -42,6 +42,11 @@ RESPONSE_RULES = (
         "match": "Harden backend startup and progress detection",
         "response_summary": "Hardened backend startup and no-progress detection so stuck candidates are cut off earlier.",
     },
+    {
+        "kind": "dataset",
+        "match": "Add named stratified evaluation slices",
+        "response_summary": "Added named stratified evaluation slices so prepared datasets can separate benchmark, smoke, and audit behavior more clearly.",
+    },
 )
 
 

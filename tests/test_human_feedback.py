@@ -85,6 +85,11 @@ def test_human_feedback_lowers_priority_for_recently_addressed_requests(tmp_path
                     "commit_sha": "a3c7559",
                     "response_summary": "Hardened backend startup and no-progress detection.",
                 },
+                {
+                    "kind": "dataset",
+                    "commit_sha": "3b11024",
+                    "response_summary": "Added named stratified evaluation slices.",
+                },
             ],
         },
     )
@@ -93,4 +98,5 @@ def test_human_feedback_lowers_priority_for_recently_addressed_requests(tmp_path
     items = {item["kind"]: item for item in payload["items"]}
     assert items["evaluation"]["priority"] < 12
     assert items["ops"]["priority"] < 9
+    assert payload["responses"][-1]["kind"] == "dataset"
     assert payload["responses"][0]["kind"] == "evaluation"
