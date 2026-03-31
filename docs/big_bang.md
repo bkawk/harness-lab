@@ -6,10 +6,10 @@ The GitHub repo is the lab dashboard.
 - status: `running`
 - vital_spark_at: `2026-03-31T10:12:12+00:00`
 - started_at: `2026-03-31T15:49:29+00:00`
-- last_heartbeat: `2026-03-31T15:50:14+00:00`
-- cycles_completed: `1`
+- last_heartbeat: `2026-03-31T15:51:32+00:00`
+- cycles_completed: `2`
 - genesis seed: `cand_0001`
-- last candidate: `cand_0044`
+- last candidate: `cand_0045`
 - last dataset: `abc_boundary512`
 - last commit: `-`
 - last publish message: `Publishing skipped.`
@@ -17,7 +17,7 @@ The GitHub repo is the lab dashboard.
 - novelty cycles triggered: `0`
 
 ## Latest Step
-- candidate: `cand_0044`
+- candidate: `cand_0045`
 - dataset: `abc_boundary512` via `reused_prepared_dataset`
 - seed action: `existing`
 - proposal status: `candidate`
@@ -37,11 +37,11 @@ The GitHub repo is the lab dashboard.
 - backend_poll_interval_seconds: `-`
 
 ## Recent Candidates
+- `cand_0045`: outcome `stalled`; diagnosis `complete`; benchmark `None`
 - `cand_0044`: outcome `stalled`; diagnosis `complete`; benchmark `None`
 - `cand_0043`: outcome `stalled`; diagnosis `complete`; benchmark `None`
 - `cand_0042`: outcome `stalled`; diagnosis `complete`; benchmark `None`
 - `cand_0041`: outcome `stalled`; diagnosis `complete`; benchmark `None`
-- `cand_0040`: outcome `stalled`; diagnosis `complete`; benchmark `None`
 
 ## Science Leaders
 - best benchmark: `cand_0013` -> `0.3847249926656351`
@@ -101,5 +101,5 @@ The GitHub repo is the lab dashboard.
 
 ## Diversity
 - summary: `Recent branching still has room, but `initial_harness` is the current active line.`
-- current_mechanism_streak: `1`
+- current_mechanism_streak: `2`
 - novelty_step_recommended: `False`
