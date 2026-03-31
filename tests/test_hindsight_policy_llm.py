@@ -63,6 +63,26 @@ def test_invalid_llm_hindsight_falls_back(tmp_path, monkeypatch):
     assert result.get("hindsight_reviewer") != "claude"
 
 
+def test_hindsight_prefers_recent_scored_window_for_live_pressure(tmp_path):
+    candidates_dir = tmp_path / "candidates"
+    _make_candidate(candidates_dir, "cand_0001", outcome_label="dead_end")
+    _make_candidate(candidates_dir, "cand_0002", outcome_label="dead_end")
+    _make_candidate(candidates_dir, "cand_0003", outcome_label="keeper")
+    _make_candidate(candidates_dir, "cand_0004", outcome_label="keeper")
+    _make_candidate(candidates_dir, "cand_0005", outcome_label="keeper")
+    _make_candidate(candidates_dir, "cand_0006", outcome_label="keeper")
+    _make_candidate(candidates_dir, "cand_0007", outcome_label="keeper")
+    _make_candidate(candidates_dir, "cand_0008", outcome_label="keeper")
+    _make_candidate(candidates_dir, "cand_0009", outcome_label="audit_blocked")
+
+    result = hindsight_module.build_hindsight(candidates_dir)
+
+    assert result["recent_scored_candidate_count"] == 8
+    assert result["recent_top_outcomes"][0]["label"] == "keeper"
+    assert result["recent_top_outcomes"][0]["count"] == 6
+    assert result["summary"].startswith("In the recent scored window")
+
+
 def test_llm_policy_can_override_summary(tmp_path, monkeypatch):
     candidates_dir = tmp_path / "candidates"
     memory_dir = tmp_path / "memory"

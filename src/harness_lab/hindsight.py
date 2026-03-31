@@ -132,8 +132,17 @@ def _backend_fingerprint_stats(index: dict) -> list[dict]:
     return results
 
 
+def _recent_scored_candidates(index: dict, *, window: int = 8) -> list[dict]:
+    scored = [
+        item
+        for item in index.get("candidates", [])
+        if item.get("benchmark_score") is not None or item.get("audit_score") is not None
+    ]
+    return scored[-window:]
+
+
 def _llm_hindsight_prompt(index: dict, heuristic_payload: dict) -> str:
-    recent_candidates = list(index.get("candidates", []))[-8:]
+    recent_candidates = _recent_scored_candidates(index, window=8)
     compact_recent = [
         {
             "candidate_id": item.get("candidate_id", ""),
@@ -191,6 +200,14 @@ def build_hindsight(candidates_dir: Path) -> dict:
     index = build_candidate_index(candidates_dir)
     outcome_counts = Counter(index.get("outcome_label_counts", {}))
     failure_counts = Counter(index.get("observed_failure_mode_counts", {}))
+    recent_scored = _recent_scored_candidates(index, window=8)
+    recent_outcome_counts = Counter(str(item.get("outcome_label", "")).strip() for item in recent_scored if str(item.get("outcome_label", "")).strip())
+    recent_failure_counts: Counter[str] = Counter()
+    for candidate in recent_scored:
+        for failure_mode in candidate.get("observed_failure_modes", []):
+            label = str(failure_mode).strip()
+            if label:
+                recent_failure_counts[label] += 1
     mechanism_stats = _mechanism_stats(index)
     backend_fingerprint_stats = _backend_fingerprint_stats(index)
     backend_module_summary = build_backend_module_summary(candidates_dir)
@@ -252,6 +269,8 @@ def build_hindsight(candidates_dir: Path) -> dict:
         )
     )
 
+    recent_hindsight_findings: list[str] = []
+    historical_hindsight_findings: list[str] = []
     hindsight_findings: list[str] = []
     policy_adjustments: list[str] = []
     backend_module_notes: list[str] = []
@@ -259,22 +278,42 @@ def build_hindsight(candidates_dir: Path) -> dict:
     dead_end_count = int(outcome_counts.get("dead_end", 0))
     train_error_count = int(outcome_counts.get("train_error", 0))
     audit_blocked_count = int(outcome_counts.get("audit_blocked", 0))
+    recent_dead_end_count = int(recent_outcome_counts.get("dead_end", 0))
+    recent_train_error_count = int(recent_outcome_counts.get("train_error", 0))
+    recent_audit_blocked_count = int(recent_outcome_counts.get("audit_blocked", 0))
 
-    if dead_end_count >= 2:
-        hindsight_findings.append(
-            f"The lab repeated dead-end candidates {dead_end_count} times; similar proposal shapes should cool down sooner."
+    if recent_dead_end_count >= 2:
+        recent_hindsight_findings.append(
+            f"In the recent scored window, the lab repeated dead-end candidates {recent_dead_end_count} times; similar proposal shapes should cool down sooner."
         )
         policy_adjustments.append("Increase cooldown penalties for mechanisms with repeated dead_end outcomes.")
-    if train_error_count >= 1:
-        hindsight_findings.append(
-            f"The lab encountered {train_error_count} train-error outcomes; it should have used smaller or more instrumented follow-ups earlier."
+    elif dead_end_count >= 2:
+        historical_hindsight_findings.append(
+            f"Historically, the lab repeated dead-end candidates {dead_end_count} times; similar proposal shapes should cool down sooner."
+        )
+        policy_adjustments.append("Increase cooldown penalties for mechanisms with repeated dead_end outcomes.")
+    if recent_train_error_count >= 1:
+        recent_hindsight_findings.append(
+            f"In the recent scored window, the lab encountered {recent_train_error_count} train-error outcomes; it should have used smaller or more instrumented follow-ups earlier."
         )
         policy_adjustments.append("Prefer safer follow-ups after any train_error and require stronger trace capture review.")
-    if audit_blocked_count >= 1:
-        hindsight_findings.append(
-            f"The lab saw {audit_blocked_count} audit-blocked outcomes; it should have emphasized transfer-stability checks earlier."
+    elif train_error_count >= 1:
+        historical_hindsight_findings.append(
+            f"Historically, the lab encountered {train_error_count} train-error outcomes; it should have used smaller or more instrumented follow-ups earlier."
+        )
+        policy_adjustments.append("Prefer safer follow-ups after any train_error and require stronger trace capture review.")
+    if recent_audit_blocked_count >= 1:
+        recent_hindsight_findings.append(
+            f"In the recent scored window, the lab saw {recent_audit_blocked_count} audit-blocked outcomes; it should emphasize transfer-stability checks."
         )
         policy_adjustments.append("Raise priority for proposals that directly target transfer stability after an audit_blocked result.")
+    elif audit_blocked_count >= 1:
+        historical_hindsight_findings.append(
+            f"Historically, the lab saw {audit_blocked_count} audit-blocked outcomes; it should have emphasized transfer-stability checks earlier."
+        )
+        policy_adjustments.append("Raise priority for proposals that directly target transfer stability after an audit_blocked result.")
+    hindsight_findings.extend(recent_hindsight_findings)
+    hindsight_findings.extend(historical_hindsight_findings)
     if over_explored:
         hindsight_findings.append(
             f"The mechanism `{over_explored[0]['mechanism']}` appears over-explored relative to its evidence."
@@ -367,11 +406,14 @@ def build_hindsight(candidates_dir: Path) -> dict:
 
     payload = {
         "candidate_count": index.get("candidate_count", 0),
+        "recent_scored_candidate_count": len(recent_scored),
         "summary": summary,
         "hindsight_findings": hindsight_findings,
         "policy_adjustments": policy_adjustments,
         "top_outcomes": _top_items(outcome_counts, limit=5, minimum=1),
         "top_failure_modes": _top_items(failure_counts, limit=5, minimum=1),
+        "recent_top_outcomes": _top_items(recent_outcome_counts, limit=5, minimum=1),
+        "recent_top_failure_modes": _top_items(recent_failure_counts, limit=5, minimum=1),
         "over_explored_mechanisms": over_explored[:5],
         "under_explored_promising_mechanisms": under_explored_promising[:5],
         "over_explored_backend_fingerprints": over_explored_backend_fingerprints[:5],
@@ -404,11 +446,14 @@ def read_hindsight(memory_dir: Path) -> dict:
     if not path.exists():
         return {
             "candidate_count": 0,
+            "recent_scored_candidate_count": 0,
             "summary": "",
             "hindsight_findings": [],
             "policy_adjustments": [],
             "top_outcomes": [],
             "top_failure_modes": [],
+            "recent_top_outcomes": [],
+            "recent_top_failure_modes": [],
             "over_explored_mechanisms": [],
             "under_explored_promising_mechanisms": [],
             "over_explored_backend_fingerprints": [],
