@@ -8,7 +8,7 @@
 - `Improve transfer-stability evaluation or smoke tests so promising candidates fail earlier before full audit. Current science-debug issue: vram_headroom.`
 
 ## Options
-- [Recommended] `Mutate science_model`: `Recent backend edits are concentrated in `science_model` with average transfer gap 0.037862.`
+- [Recommended] `Mutate science_model`: `Recent backend edits are concentrated in `science_model` with average transfer gap 0.037228.`
 - [Option] `Wait for more data`: `Recent evidence may still be too thin or too noisy; a few more scored candidates could produce a cleaner signal.`
 
 ## Evidence
