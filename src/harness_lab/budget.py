@@ -67,6 +67,16 @@ def build_budget(memory_dir: Path) -> dict:
             }
         )
 
+    # --- Import 5: throughput-adjusted budgets ---
+    throughput_summary = hindsight.get("throughput_summary", {})
+    early_completions = int(throughput_summary.get("early_completion_count", 0))
+    total_runs = int(throughput_summary.get("total_runs", 0))
+    if total_runs > 0 and early_completions / total_runs > 0.5:
+        for item in mechanism_budgets:
+            item["allowed_followups"] += 1
+            item["remaining_followups"] = max(0, item["allowed_followups"] - item["consumed_followups"])
+            item["exhausted"] = item["remaining_followups"] <= 0
+
     mechanism_budgets.sort(key=lambda item: (item["exhausted"], item["remaining_followups"], item["mechanism"]))
     exploration_mode = "balanced"
     summary = "Use normal exploration budgeting."

@@ -186,6 +186,63 @@ def _run_command_review(memory_dir: Path, trigger_reason: str) -> dict | None:
     return payload
 
 
+def _run_llm_review(memory_dir: Path, trigger_reason: str, index: dict, hindsight: dict, policy: dict) -> dict | None:
+    """Optionally call an LLM to produce a structured external review."""
+    model = os.environ.get("HARNESS_LAB_LLM_REVIEW_MODEL", "").strip()
+    if not model:
+        return None
+    try:
+        import anthropic
+    except ImportError:
+        return None
+
+    candidate_count = int(index.get("candidate_count", 0))
+    recent = index.get("candidates", [])[-5:]
+    recent_summary = "; ".join(
+        f"{c.get('candidate_id','?')}={c.get('outcome_label','?')}" for c in recent
+    )
+    prompt = (
+        f"You are reviewing an automated research lab after {candidate_count} candidates.\n"
+        f"Trigger: {trigger_reason}\n"
+        f"Recent candidates: {recent_summary}\n"
+        f"Hindsight summary: {hindsight.get('summary', 'none')}\n"
+        f"Policy mode: {policy.get('selection_mode', 'balanced')}\n"
+        f"Policy summary: {policy.get('summary', '')}\n\n"
+        "Provide a JSON object with these fields:\n"
+        '- "situation_summary": one-paragraph summary\n'
+        '- "lab_advice": array of {{kind, summary}} objects for the automated lab\n'
+        '- "human_advice": array of {{kind, summary}} objects for a human operator\n'
+        '- "confidence": float 0-1\n'
+        "Respond with ONLY the JSON object, no markdown fences."
+    )
+    api_key = os.environ.get("HARNESS_LAB_LLM_REVIEW_API_KEY") or os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        return None
+    try:
+        client = anthropic.Anthropic(api_key=api_key)
+        response = client.messages.create(
+            model=model,
+            max_tokens=1024,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        text = response.content[0].text.strip()
+        parsed = json.loads(text)
+        return {
+            "reviewer": "llm",
+            "situation_summary": str(parsed.get("situation_summary", "")),
+            "lab_advice": list(parsed.get("lab_advice", []))[:5],
+            "human_advice": list(parsed.get("human_advice", []))[:5],
+            "confidence": float(parsed.get("confidence", 0.5)),
+            "evidence_used": [
+                "artifacts/memory/candidate_index.json",
+                "artifacts/memory/hindsight.json",
+                "artifacts/memory/policy.json",
+            ],
+        }
+    except Exception:
+        return None
+
+
 def maybe_request_external_review(candidates_dir: Path, memory_dir: Path, *, force: bool = False) -> dict:
     from harness_lab.policy import read_policy
 
@@ -211,7 +268,11 @@ def maybe_request_external_review(candidates_dir: Path, memory_dir: Path, *, for
         }
     )
     if should_review:
-        review_payload = _run_command_review(memory_dir, trigger_reason) or _heuristic_review_payload(index, hindsight, policy, trigger_reason, candidate_count)
+        review_payload = (
+            _run_command_review(memory_dir, trigger_reason)
+            or _run_llm_review(memory_dir, trigger_reason, index, hindsight, policy)
+            or _heuristic_review_payload(index, hindsight, policy, trigger_reason, candidate_count)
+        )
         payload.update(review_payload)
         payload["last_review_candidate_count"] = candidate_count
     elif previous.get("status") == "reviewed":

@@ -54,6 +54,10 @@ class CandidateWorkspace:
         return self.root / "memory"
 
     @property
+    def preflight_dir(self) -> Path:
+        return self.root / "preflight"
+
+    @property
     def proposal_path(self) -> Path:
         return self.root / "proposal.json"
 
@@ -95,6 +99,7 @@ def create_candidate_workspace(base_dir: Path, candidate_id: str, parent_id: str
         workspace.outcome_dir,
         workspace.diagnosis_dir,
         workspace.memory_dir,
+        workspace.preflight_dir,
     ):
         path.mkdir(parents=True, exist_ok=True)
 
@@ -114,6 +119,7 @@ def create_candidate_workspace(base_dir: Path, candidate_id: str, parent_id: str
                 "outcome": str(workspace.outcome_dir.relative_to(root)),
                 "diagnosis": str(workspace.diagnosis_dir.relative_to(root)),
                 "memory": str(workspace.memory_dir.relative_to(root)),
+                "preflight": str(workspace.preflight_dir.relative_to(root)),
             },
         },
     )

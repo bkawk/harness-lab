@@ -7,6 +7,7 @@ from harness_lab.diagnosis import reconcile_diagnosis_from_outcome
 from harness_lab.evidence import capture_candidate_evidence
 from harness_lab.execution import plan_execution_for_candidate
 from harness_lab.hardware import refresh_hardware_profile
+from harness_lab.outcome import validate_keeper_candidate, update_outcome_for_candidate as _update_outcome
 from harness_lab.proposal import draft_proposal_for_candidate
 from harness_lab.runner import run_candidate
 from harness_lab.synthesis import refresh_memory_artifacts
@@ -53,9 +54,7 @@ def advance_candidate_loop(
         if simulate_outcome:
             outcome = run_candidate(repo_dir, candidates_dir, candidate_id, backend=runner_backend).outcome
         else:
-            from harness_lab.outcome import update_outcome_for_candidate
-
-            outcome = update_outcome_for_candidate(
+            outcome = _update_outcome(
                 candidates_dir,
                 candidate_id,
                 status="complete",
@@ -68,6 +67,20 @@ def advance_candidate_loop(
                 evidence=evidence,
             )
         diagnosis = reconcile_diagnosis_from_outcome(candidates_dir, candidate_id)
+
+        # --- Import 3: keeper completion discipline ---
+        if outcome.outcome_label == "keeper":
+            review = validate_keeper_candidate(candidates_dir, candidate_id)
+            if not review["approved"]:
+                outcome = _update_outcome(
+                    candidates_dir,
+                    candidate_id,
+                    status="complete",
+                    outcome_label="dead_end",
+                    evidence=list(outcome.evidence) + [f"completion_discipline:rejected:{review['rejection_reason']}"],
+                )
+                diagnosis = reconcile_diagnosis_from_outcome(candidates_dir, candidate_id)
+
         outcome_status = outcome.status
         diagnosis_status = diagnosis.status
 

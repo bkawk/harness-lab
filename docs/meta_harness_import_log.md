@@ -10,41 +10,38 @@ This log tracks the main ideas we wanted to absorb from the Meta-Harness artifac
   - command backends now write `traces/live_command.json`
 - active backend dashboard surface
   - `docs/big_bang.md` can now show live backend state while a run is in flight
-
-## Still Worth Importing
-
-- stronger environment bootstrap for the runner command itself
-  - include a compact preflight summary of toolchain, dataset readiness, and backend path directly in command traces
+- stronger environment bootstrap for the runner command
+  - `build_environment_preflight()` gathers toolchain, dataset readiness, and backend path
+  - written to `traces/environment_preflight.json` and embedded in the run trace
 - earlier command-completion and stale-process handling
-  - use polling data to classify:
-    - completed quickly
-    - stalled
-    - crashed early
-  - and feed that back into outcome labels and policy
+  - `classify_process_behavior()` labels each run as completed_quickly, normal_completion, slow_completion, crashed_early, or stalled
+  - stale-process timeout (`HARNESS_LAB_RUNNER_STALE_SECONDS`, default 600s) terminates stuck processes and records a `stalled` outcome
+  - classifications are aggregated in hindsight and feed into policy adjustments
 - tighter completion discipline
-  - add a final minimal-change or minimal-side-effects review before a candidate can be treated as a keeper
+  - `validate_keeper_candidate()` gates keeper candidates through a minimal-change review
+  - checks: has_changes, bounded_changes, not_critical_severity, failure_modes_improved
+  - rejected keepers are downgraded to dead_end with evidence
+  - review artifact written to `outcome/keeper_review.json`
 - higher-value use of bounded external review
-  - optionally plug a real LLM reviewer into the new `external_review.json` contract
-  - keep the split between:
-    - `lab_advice`
-    - `human_advice`
+  - `_run_llm_review()` optionally calls an LLM via the Anthropic SDK
+  - configured via `HARNESS_LAB_LLM_REVIEW_MODEL` and `HARNESS_LAB_LLM_REVIEW_API_KEY`
+  - falls back to heuristic review if not configured or if the call fails
+  - preserves the lab_advice / human_advice split
 - command/runtime throughput accounting
-  - preserve how much wall-clock was saved by polling or early completion detection
-  - use that as another signal in policy and budget
+  - `compute_throughput_accounting()` tracks wall-clock, polling overhead, and time saved
+  - written to `traces/throughput.json` and embedded in the run trace
+  - aggregated in hindsight as `throughput_summary`
+  - policy reads throughput signals (`efficient_polling`, `low_polling_savings`)
+  - budget grants extra follow-ups when >50% of runs complete early
 - candidate preflight bundle
-  - package the most relevant files for a candidate into one place before execution:
-    - bootstrap snapshot
-    - execution plan
-    - proposal
-    - diagnosis
-    - backend/dataset readiness
+  - `build_preflight_bundle()` packages bootstrap snapshot, execution plan, proposal, diagnosis, backend/dataset readiness
+  - written to `preflight/bundle.json` before command execution
+  - path passed to backend via `HARNESS_LAB_PREFLIGHT_BUNDLE_PATH` env var
 
 ## Current Recommendation
 
-Let the lab run for a while before importing more.
+All planned imports are now integrated. Focus on:
 
-The next import should be chosen from real evidence:
-
-- if command runs stall, prioritize stale-process classification
-- if keepers are noisy, prioritize stronger completion discipline
-- if the lab gets repetitive, prioritize richer external review
+- running the lab to generate real evidence for the new signals
+- watching for stale-process events or keeper rejections in practice
+- enabling LLM review when the lab gets repetitive (set `HARNESS_LAB_LLM_REVIEW_MODEL`)

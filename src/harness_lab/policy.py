@@ -101,6 +101,28 @@ def build_policy(candidates_dir: Path, memory_dir: Path) -> dict:
         preferred_runner_backend = "simulated"
         evidence.append("policy:local_backend_simulated")
 
+    # --- Import 2 & 5: process classification and throughput signals ---
+    process_stats = hindsight.get("process_classification_counts", {})
+    stalled_count = int(process_stats.get("stalled", 0))
+    crashed_count = int(process_stats.get("crashed_early", 0))
+    if stalled_count >= 2:
+        selection_mode = "stabilize"
+        cooldown_multiplier = max(cooldown_multiplier, 2.0)
+        summary = "Multiple stalled processes detected; stabilize and investigate backend health."
+        evidence.append("policy:stale_process_pressure")
+    if crashed_count >= 2:
+        cooldown_multiplier = max(cooldown_multiplier, 1.5)
+        summary = "Multiple early crashes detected; prefer safer follow-ups."
+        evidence.append("policy:crash_pressure")
+
+    throughput_summary = hindsight.get("throughput_summary", {})
+    avg_saved = float(throughput_summary.get("avg_time_saved", 0))
+    if avg_saved > 60:
+        evidence.append("policy:efficient_polling")
+    avg_wall = float(throughput_summary.get("avg_wall_clock", 0))
+    if avg_wall > 0 and avg_saved / max(avg_wall, 1) < 0.05:
+        evidence.append("policy:low_polling_savings")
+
     if policy_adjustments:
         summary = policy_adjustments[0]
     if str(external_review.get("status", "")) == "reviewed" and external_review.get("lab_advice"):

@@ -379,6 +379,23 @@ def _run_command_backend(
     proposal_path = candidate_dir / "proposal.json"
     diagnosis_path = candidate_dir / "diagnosis" / "summary.json"
     outcome_path = candidate_dir / "outcome" / "result.json"
+    memory_dir = candidates_dir.parent / "memory"
+
+    # --- Import 1: environment preflight ---
+    env_preflight = build_environment_preflight(
+        repo_dir, candidates_dir, candidate_id,
+        dataset_id, dataset_record, hardware_profile, command,
+    )
+
+    # --- Import 6: preflight bundle ---
+    preflight_dir = candidate_dir / "preflight"
+    preflight_dir.mkdir(parents=True, exist_ok=True)
+    bundle = build_preflight_bundle(candidates_dir, memory_dir, candidate_id)
+    bundle["environment_preflight"] = env_preflight
+    (preflight_dir / "bundle.json").write_text(
+        json.dumps(bundle, indent=2, sort_keys=True) + "\n", encoding="utf-8",
+    )
+
     env = {
         **os.environ,
         "PYTHONPATH": str(repo_dir / "src")
@@ -396,6 +413,7 @@ def _run_command_backend(
         "HARNESS_LAB_TRACE_DIR": str(candidate_dir / "traces"),
         "HARNESS_LAB_DATASET_ID": dataset_id,
         "HARNESS_LAB_DATASET_PATH": str(dataset_record.get("local_path", "")) if dataset_record else "",
+        "HARNESS_LAB_PREFLIGHT_BUNDLE_PATH": str(preflight_dir / "bundle.json"),
     }
     if hardware_profile.get("environment_hint"):
         env["HARNESS_LAB_HARDWARE_ENVIRONMENT"] = str(hardware_profile["environment_hint"])
@@ -409,7 +427,9 @@ def _run_command_backend(
         text=True,
     )
     poll_interval_seconds = float(os.environ.get("HARNESS_LAB_RUNNER_POLL_SECONDS", "1.0") or 1.0)
+    stale_timeout = float(os.environ.get("HARNESS_LAB_RUNNER_STALE_SECONDS", str(STALE_TIMEOUT_DEFAULT)) or STALE_TIMEOUT_DEFAULT)
     monotonic_start = time.monotonic()
+    was_stalled = False
     with stdout_path.open("w", encoding="utf-8") as stdout_file, stderr_path.open("w", encoding="utf-8") as stderr_file:
         process = subprocess.Popen(
             command,
@@ -448,6 +468,31 @@ def _run_command_backend(
                     returncode=returncode,
                 )
                 break
+            # --- Import 2: stale-process detection ---
+            elapsed = time.monotonic() - monotonic_start
+            if elapsed >= stale_timeout:
+                process.terminate()
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait(timeout=5)
+                returncode = process.returncode
+                was_stalled = True
+                _write_live_status(
+                    candidates_dir=candidates_dir,
+                    candidate_id=candidate_id,
+                    backend="command",
+                    command=command,
+                    started_at=started_at,
+                    status="stalled",
+                    pid=process.pid,
+                    poll_interval_seconds=poll_interval_seconds,
+                    last_poll_at=now,
+                    finished_at=now,
+                    returncode=returncode,
+                )
+                break
             _write_live_status(
                 candidates_dir=candidates_dir,
                 candidate_id=candidate_id,
@@ -462,8 +507,61 @@ def _run_command_backend(
             time.sleep(max(0.1, poll_interval_seconds))
 
     duration_seconds = time.monotonic() - monotonic_start
+
+    # --- Import 2: process classification ---
+    proc_class = classify_process_behavior(
+        duration_seconds, returncode, poll_interval_seconds, stale_timeout,
+    )
+    if was_stalled:
+        proc_class["classification"] = "stalled"
+
+    # --- Import 5: throughput accounting ---
+    throughput = compute_throughput_accounting(
+        duration_seconds, poll_interval_seconds, stale_timeout,
+    )
+
     stdout_text = stdout_path.read_text(encoding="utf-8")
     stderr_text = stderr_path.read_text(encoding="utf-8")
+
+    if was_stalled:
+        # Stalled processes get a structured outcome instead of raising
+        outcome = update_outcome_for_candidate(
+            candidates_dir,
+            candidate_id,
+            status="complete",
+            outcome_label="stalled",
+            benchmark_summary="Process exceeded stale timeout and was terminated.",
+            audit_summary="",
+            observed_failure_modes=["stale_process"],
+            evidence=[
+                f"trace:stdout:{stdout_path.name}",
+                f"trace:stderr:{stderr_path.name}",
+                "trace:backend:command",
+                f"process:classification:{proc_class['classification']}",
+                f"process:duration:{proc_class['duration_seconds']}",
+            ],
+        )
+        _write_trace(
+            candidates_dir=candidates_dir,
+            candidate_id=candidate_id,
+            backend="command",
+            repo_dir=repo_dir,
+            command=command,
+            started_at=started_at,
+            finished_at=utc_now(),
+            returncode=returncode,
+            duration_seconds=duration_seconds,
+            poll_interval_seconds=poll_interval_seconds,
+            stdout_path=stdout_path,
+            stderr_path=stderr_path,
+            outcome=outcome,
+            result_path=None,
+            environment_preflight=env_preflight,
+            process_classification=proc_class,
+            throughput_accounting=throughput,
+        )
+        return RunnerResult(candidate_id=candidate_id, backend="command", outcome=outcome)
+
     if returncode != 0:
         raise RuntimeError(f"Command runner failed for {candidate_id}: {stderr_text.strip() or stdout_text.strip()}")
 
@@ -479,6 +577,9 @@ def _run_command_backend(
             f"trace:stderr:{stderr_path.name}",
             f"trace:backend_result:{result_path.name}",
             "trace:backend:command",
+            f"process:classification:{proc_class['classification']}",
+            f"process:duration:{proc_class['duration_seconds']}",
+            f"trace:environment_preflight:environment_preflight.json",
         ]
     )
     outcome = update_outcome_for_candidate(
@@ -508,6 +609,9 @@ def _run_command_backend(
         stderr_path=stderr_path,
         outcome=outcome,
         result_path=result_path,
+        environment_preflight=env_preflight,
+        process_classification=proc_class,
+        throughput_accounting=throughput,
     )
     return RunnerResult(candidate_id=candidate_id, backend="command", outcome=outcome)
 

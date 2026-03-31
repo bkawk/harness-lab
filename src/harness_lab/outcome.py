@@ -6,7 +6,7 @@ from pathlib import Path
 from harness_lab.memory import read_json
 from harness_lab.workspace import write_json
 
-VALID_OUTCOME_STATUS = {"pending", "complete"}
+VALID_OUTCOME_STATUS = {"pending", "complete", "keeper_pending_review"}
 
 
 @dataclass(frozen=True)
@@ -29,6 +29,71 @@ class CandidateOutcome:
             "observed_failure_modes": list(self.observed_failure_modes),
             "evidence": list(self.evidence),
         }
+
+
+MAX_KEEPER_CHANGED_FILES = 10
+
+
+def validate_keeper_candidate(candidates_dir: Path, candidate_id: str) -> dict:
+    """Gate keeper candidates through a minimal-change review before acceptance."""
+    candidate_dir = candidates_dir / candidate_id
+    outcome = read_json(candidate_dir / "outcome" / "result.json")
+    proposal = read_json(candidate_dir / "proposal.json") if (candidate_dir / "proposal.json").exists() else {}
+    diagnosis = read_json(candidate_dir / "diagnosis" / "summary.json") if (candidate_dir / "diagnosis" / "summary.json").exists() else {}
+    patch_summary = read_json(candidate_dir / "patches" / "summary.json") if (candidate_dir / "patches" / "summary.json").exists() else {}
+
+    changed_file_count = int(patch_summary.get("changed_file_count", 0) or 0)
+    severity = str(diagnosis.get("severity", "unknown"))
+    parent_id = proposal.get("parent_id") or outcome.get("parent_id")
+    parent_failures = set()
+    if parent_id:
+        parent_diagnosis_path = candidates_dir / str(parent_id) / "diagnosis" / "summary.json"
+        if parent_diagnosis_path.exists():
+            parent_diag = read_json(parent_diagnosis_path)
+            parent_failures = {str(f) for f in parent_diag.get("failure_modes", []) if str(f).strip()}
+
+    current_failures = {str(f) for f in outcome.get("observed_failure_modes", []) if str(f).strip()}
+
+    checks = []
+
+    # Check 1: has actual changes
+    has_changes = changed_file_count > 0
+    checks.append({"check": "has_changes", "passed": has_changes, "detail": f"changed_file_count={changed_file_count}"})
+
+    # Check 2: not too many changes
+    bounded_changes = changed_file_count <= MAX_KEEPER_CHANGED_FILES
+    checks.append({"check": "bounded_changes", "passed": bounded_changes, "detail": f"max={MAX_KEEPER_CHANGED_FILES}"})
+
+    # Check 3: no critical severity
+    not_critical = severity != "critical"
+    checks.append({"check": "not_critical_severity", "passed": not_critical, "detail": f"severity={severity}"})
+
+    # Check 4: failure modes improved vs parent
+    if parent_failures and current_failures:
+        improved = current_failures != parent_failures
+    else:
+        improved = True
+    checks.append({"check": "failure_modes_improved", "passed": improved, "detail": f"parent_failures={len(parent_failures)}, current={len(current_failures)}"})
+
+    approved = all(c["passed"] for c in checks)
+    rejection_reason = None
+    if not approved:
+        failed = [c["check"] for c in checks if not c["passed"]]
+        rejection_reason = f"Keeper review failed: {', '.join(failed)}"
+
+    result = {
+        "candidate_id": candidate_id,
+        "approved": approved,
+        "checks": checks,
+        "rejection_reason": rejection_reason,
+    }
+
+    # Write the review artifact
+    review_path = candidate_dir / "outcome" / "keeper_review.json"
+    from harness_lab.workspace import write_json as _write_json
+    _write_json(review_path, result)
+
+    return result
 
 
 def outcome_path_for_candidate(candidates_dir: Path, candidate_id: str) -> Path:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -237,6 +238,47 @@ def build_hindsight(candidates_dir: Path) -> dict:
             f"Raise priority for backend edits tagged `{under_explored_backend_fingerprints[0]['fingerprint']}`."
         )
 
+    # --- Import 2 & 5: aggregate process classification and throughput ---
+    process_classification_counts: Counter[str] = Counter()
+    throughput_wall_clocks: list[float] = []
+    throughput_saved: list[float] = []
+    early_completion_count = 0
+
+    # Read from trace files
+    for candidate_root in sorted(path for path in candidates_dir.iterdir() if path.is_dir()):
+        # Process classification from run trace
+        run_trace_path = candidate_root / "traces" / "run.json"
+        if run_trace_path.exists():
+            try:
+                run_trace = json.loads(run_trace_path.read_text(encoding="utf-8"))
+                pc = run_trace.get("process_classification", {})
+                classification = str(pc.get("classification", "")).strip()
+                if classification:
+                    process_classification_counts[classification] += 1
+            except (json.JSONDecodeError, ValueError, KeyError):
+                pass
+        # Throughput from dedicated file
+        throughput_path = candidate_root / "traces" / "throughput.json"
+        if throughput_path.exists():
+            try:
+                tp = json.loads(throughput_path.read_text(encoding="utf-8"))
+                wall = float(tp.get("wall_clock_seconds", 0))
+                saved = float(tp.get("time_saved_estimate_seconds", 0))
+                throughput_wall_clocks.append(wall)
+                throughput_saved.append(saved)
+                if tp.get("early_completion_detected"):
+                    early_completion_count += 1
+            except (json.JSONDecodeError, ValueError, KeyError):
+                pass
+
+    throughput_summary = {
+        "total_runs": len(throughput_wall_clocks),
+        "avg_wall_clock": round(sum(throughput_wall_clocks) / len(throughput_wall_clocks), 3) if throughput_wall_clocks else 0,
+        "avg_time_saved": round(sum(throughput_saved) / len(throughput_saved), 3) if throughput_saved else 0,
+        "total_time_saved": round(sum(throughput_saved), 3),
+        "early_completion_count": early_completion_count,
+    }
+
     summary = (
         hindsight_findings[0]
         if hindsight_findings
@@ -256,6 +298,8 @@ def build_hindsight(candidates_dir: Path) -> dict:
         "under_explored_backend_fingerprints": under_explored_backend_fingerprints[:5],
         "mechanism_stats": [item.to_dict() for item in mechanism_stats],
         "backend_fingerprint_stats": backend_fingerprint_stats,
+        "process_classification_counts": dict(sorted(process_classification_counts.items())),
+        "throughput_summary": throughput_summary,
     }
 
 
@@ -281,6 +325,8 @@ def read_hindsight(memory_dir: Path) -> dict:
             "under_explored_backend_fingerprints": [],
             "mechanism_stats": [],
             "backend_fingerprint_stats": [],
+            "process_classification_counts": {},
+            "throughput_summary": {},
         }
     import json
 
