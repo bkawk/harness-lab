@@ -71,6 +71,7 @@ def build_decision_bundle(
     index = build_candidate_index(candidates_dir)
     science_summary = read_json(memory_dir / "science_summary.json") if (memory_dir / "science_summary.json").exists() else {}
     science_debug_summary = read_json(memory_dir / "science_debug_summary.json") if (memory_dir / "science_debug_summary.json").exists() else {}
+    backend_module_summary = read_json(memory_dir / "backend_module_summary.json") if (memory_dir / "backend_module_summary.json").exists() else {}
     hindsight = read_hindsight(memory_dir)
     policy = read_policy(memory_dir)
     budget = read_budget(memory_dir)
@@ -120,6 +121,7 @@ def build_decision_bundle(
         "dataset_context": dataset_record or {},
         "science_summary": science_summary,
         "science_debug_summary": science_debug_summary,
+        "backend_module_summary": backend_module_summary,
         "leaders": science_summary.get("leaders", {}),
         "recent_scored_candidates": finished_scored[-5:],
         "pending_candidates": pending_candidates[-8:],
@@ -134,6 +136,7 @@ def build_decision_bundle(
             "under_explored_promising_mechanisms": hindsight.get("under_explored_promising_mechanisms", [])[:5],
             "over_explored_backend_fingerprints": hindsight.get("over_explored_backend_fingerprints", [])[:5],
             "under_explored_backend_fingerprints": hindsight.get("under_explored_backend_fingerprints", [])[:5],
+            "backend_module_notes": hindsight.get("backend_module_notes", [])[:8],
             "throughput_summary": hindsight.get("throughput_summary", {}),
             "process_classification_counts": hindsight.get("process_classification_counts", {}),
         },
@@ -163,6 +166,7 @@ def build_decision_bundle(
         "counts": {
             "mechanism_counts": index.get("diagnosis_mechanism_counts", {}),
             "backend_fingerprint_counts": index.get("backend_fingerprint_counts", {}),
+            "backend_module_counts": index.get("backend_module_counts", {}),
             "failure_mode_counts": index.get("failure_mode_counts", {}),
             "outcome_label_counts": index.get("outcome_label_counts", {}),
             "children_by_parent": children_by_parent,
@@ -190,6 +194,7 @@ def build_bootstrap_snapshot(
     index = read_json(memory_dir / "candidate_index.json") if (memory_dir / "candidate_index.json").exists() else {"candidate_count": 0, "candidates": []}
     science_summary = read_json(memory_dir / "science_summary.json") if (memory_dir / "science_summary.json").exists() else {}
     science_debug_summary = read_json(memory_dir / "science_debug_summary.json") if (memory_dir / "science_debug_summary.json").exists() else {}
+    backend_module_summary = read_json(memory_dir / "backend_module_summary.json") if (memory_dir / "backend_module_summary.json").exists() else {}
     hindsight = read_hindsight(memory_dir)
     policy = read_policy(memory_dir)
     budget = read_budget(memory_dir)
@@ -237,6 +242,10 @@ def build_bootstrap_snapshot(
             "recommended_fix": science_debug_summary.get("recommended_fix", ""),
             "findings": science_debug_summary.get("findings", [])[:5],
         },
+        "backend_module_summary": {
+            "summary": backend_module_summary.get("summary", ""),
+            "modules": backend_module_summary.get("modules", [])[:4],
+        },
         "hindsight_summary": hindsight.get("summary", ""),
         "policy_summary": policy.get("summary", ""),
         "budget_summary": budget.get("summary", ""),
@@ -262,6 +271,7 @@ def build_bootstrap_snapshot(
         "recent_candidates": recent_candidates,
         "mechanism_counts": index.get("diagnosis_mechanism_counts", {}),
         "backend_fingerprint_counts": index.get("backend_fingerprint_counts", {}),
+        "backend_module_counts": index.get("backend_module_counts", {}),
         "failure_mode_counts": index.get("failure_mode_counts", {}),
         "decision_bundle_summary": {
             "recent_scored_candidates": len(decision_bundle.get("recent_scored_candidates", [])),

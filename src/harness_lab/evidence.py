@@ -128,6 +128,23 @@ def _science_backend_fingerprints(relative_path: str, parent_lines: list[str], c
     return fingerprints
 
 
+def _science_backend_modules(changed_files: list[str]) -> list[str]:
+    module_map = {
+        "src/harness_lab/science_model.py": "science_model",
+        "src/harness_lab/science_loss.py": "science_loss",
+        "src/harness_lab/science_eval.py": "science_eval",
+        "src/harness_lab/science_config.py": "science_config",
+        "src/harness_lab/science_train.py": "science_train",
+        "src/harness_lab/science_backend.py": "science_backend",
+    }
+    modules: list[str] = []
+    for relative_path in changed_files:
+        module_name = module_map.get(relative_path)
+        if module_name and module_name not in modules:
+            modules.append(module_name)
+    return modules
+
+
 @dataclass(frozen=True)
 class EvidenceCapture:
     snapshot_manifest: Path
@@ -175,6 +192,7 @@ def capture_candidate_evidence(
             patch_chunks.append("".join(diff))
 
     combined_patch_path.write_text("".join(patch_chunks), encoding="utf-8")
+    backend_modules_touched = _science_backend_modules(changed_files)
     write_json(
         summary_path,
         {
@@ -184,6 +202,7 @@ def capture_candidate_evidence(
             "changed_files": changed_files,
             "changed_file_count": len(changed_files),
             "backend_fingerprints": sorted(backend_fingerprints),
+            "backend_modules_touched": backend_modules_touched,
             "combined_patch": str(combined_patch_path.relative_to(candidate_root)),
         },
     )

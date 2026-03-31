@@ -448,3 +448,103 @@ def write_science_debug_summary(candidates_dir: Path, output_path: Path, recent_
     payload = build_science_debug_summary(candidates_dir, recent_window=recent_window)
     output_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return output_path
+
+
+def build_backend_module_summary(candidates_dir: Path) -> dict:
+    index = build_candidate_index(candidates_dir)
+    buckets: dict[str, dict] = {}
+
+    for candidate in index.get("candidates", []):
+        modules = [str(item).strip() for item in candidate.get("backend_modules_touched", []) if str(item).strip()]
+        if not modules:
+            continue
+        benchmark_score = candidate.get("benchmark_score")
+        audit_score = candidate.get("audit_score")
+        outcome_label = str(candidate.get("outcome_label", "")).strip()
+        for module_name in modules:
+            bucket = buckets.setdefault(
+                module_name,
+                {
+                    "module": module_name,
+                    "attempts": 0,
+                    "keeper_count": 0,
+                    "improved_count": 0,
+                    "audit_blocked_count": 0,
+                    "dead_end_count": 0,
+                    "train_error_count": 0,
+                    "stalled_count": 0,
+                    "benchmark_scores": [],
+                    "audit_scores": [],
+                    "transfer_gaps": [],
+                    "recent_candidates": [],
+                },
+            )
+            bucket["attempts"] += 1
+            if outcome_label == "keeper":
+                bucket["keeper_count"] += 1
+            if outcome_label == "improved":
+                bucket["improved_count"] += 1
+            if outcome_label == "audit_blocked":
+                bucket["audit_blocked_count"] += 1
+            if outcome_label == "dead_end":
+                bucket["dead_end_count"] += 1
+            if outcome_label == "train_error":
+                bucket["train_error_count"] += 1
+            if outcome_label == "stalled":
+                bucket["stalled_count"] += 1
+            if isinstance(benchmark_score, (int, float)):
+                bucket["benchmark_scores"].append(float(benchmark_score))
+            if isinstance(audit_score, (int, float)):
+                bucket["audit_scores"].append(float(audit_score))
+            if isinstance(benchmark_score, (int, float)) and isinstance(audit_score, (int, float)):
+                bucket["transfer_gaps"].append(float(benchmark_score) - float(audit_score))
+            bucket["recent_candidates"].append(
+                {
+                    "candidate_id": candidate.get("candidate_id", ""),
+                    "outcome_label": outcome_label,
+                    "benchmark_score": benchmark_score,
+                    "audit_score": audit_score,
+                }
+            )
+
+    modules: list[dict] = []
+    for module_name, bucket in buckets.items():
+        benchmark_scores = list(bucket.pop("benchmark_scores"))
+        audit_scores = list(bucket.pop("audit_scores"))
+        transfer_gaps = list(bucket.pop("transfer_gaps"))
+        modules.append(
+            {
+                **bucket,
+                "avg_benchmark_score": (sum(benchmark_scores) / len(benchmark_scores)) if benchmark_scores else None,
+                "avg_audit_score": (sum(audit_scores) / len(audit_scores)) if audit_scores else None,
+                "avg_transfer_gap": (sum(transfer_gaps) / len(transfer_gaps)) if transfer_gaps else None,
+                "recent_candidates": bucket["recent_candidates"][-3:],
+            }
+        )
+    modules.sort(key=lambda item: (-int(item["attempts"]), item["module"]))
+
+    if modules:
+        top = modules[0]
+        if top["avg_transfer_gap"] is not None:
+            summary = (
+                f"Recent backend evolution is concentrated in {top['module']} "
+                f"({top['attempts']} candidate(s), avg transfer gap {top['avg_transfer_gap']:.6f})."
+            )
+        else:
+            summary = f"Recent backend evolution is concentrated in {top['module']} ({top['attempts']} candidate(s))."
+    else:
+        summary = "No explicit split backend modules have been touched yet."
+
+    return {
+        "summary": summary,
+        "module_count": len(modules),
+        "backend_module_counts": index.get("backend_module_counts", {}),
+        "modules": modules,
+    }
+
+
+def write_backend_module_summary(candidates_dir: Path, output_path: Path) -> Path:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    payload = build_backend_module_summary(candidates_dir)
+    output_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return output_path
