@@ -342,6 +342,8 @@ def build_science_debug_summary(candidates_dir: Path, recent_window: int = 8) ->
     index = build_candidate_index(candidates_dir)
     candidates = list(index.get("candidates", []))
     recent = candidates[-recent_window:]
+    memory_dir = candidates_dir.parent / "memory"
+    hardware_profile = read_json(memory_dir / "hardware_profile.json") if (memory_dir / "hardware_profile.json").exists() else {}
 
     rows: list[dict] = []
     full_budget_training_without_result = 0
@@ -349,6 +351,7 @@ def build_science_debug_summary(candidates_dir: Path, recent_window: int = 8) ->
     oom_failures = 0
     completed_with_scores = 0
     late_training_stalls = 0
+    peak_vram_values: list[float] = []
 
     for item in recent:
         candidate_id = str(item.get("candidate_id", "")).strip()
@@ -363,6 +366,9 @@ def build_science_debug_summary(candidates_dir: Path, recent_window: int = 8) ->
         steps = progress_payload.get("steps")
         elapsed_seconds = progress_payload.get("elapsed_seconds")
         peak_vram_mb = progress_payload.get("peak_vram_mb")
+        if peak_vram_mb is None and science_metrics_exists:
+            metrics_payload = read_json(trace_dir / "science_metrics.json")
+            peak_vram_mb = metrics_payload.get("peak_vram_mb")
         observed_failure_modes = [str(mode).strip() for mode in item.get("observed_failure_modes", []) if str(mode).strip()]
 
         row = {
@@ -379,6 +385,8 @@ def build_science_debug_summary(candidates_dir: Path, recent_window: int = 8) ->
             "peak_vram_mb": peak_vram_mb,
         }
         rows.append(row)
+        if isinstance(peak_vram_mb, (int, float)):
+            peak_vram_values.append(float(peak_vram_mb))
 
         if item.get("benchmark_score") is not None or item.get("audit_score") is not None:
             completed_with_scores += 1
@@ -408,6 +416,16 @@ def build_science_debug_summary(candidates_dir: Path, recent_window: int = 8) ->
     if completed_with_scores == 0 and rows:
         findings.append("None of the recent candidates completed with scored benchmark/audit results.")
 
+    gpu_total_gb = hardware_profile.get("gpu_memory_total_gb")
+    avg_peak_vram_mb = (sum(peak_vram_values) / len(peak_vram_values)) if peak_vram_values else None
+    avg_peak_vram_ratio = None
+    if isinstance(avg_peak_vram_mb, (int, float)) and isinstance(gpu_total_gb, (int, float)) and float(gpu_total_gb) > 0:
+        avg_peak_vram_ratio = float(avg_peak_vram_mb) / (float(gpu_total_gb) * 1024.0)
+        if oom_failures == 0 and completed_with_scores >= 2 and avg_peak_vram_ratio <= 0.2:
+            findings.append(
+                f"Recent real-backend runs are only using about {avg_peak_vram_mb:.1f} MB on average, leaving most VRAM unused."
+            )
+
     likely_issue = ""
     recommended_fix = ""
     if full_budget_training_without_result >= 2:
@@ -416,6 +434,9 @@ def build_science_debug_summary(candidates_dir: Path, recent_window: int = 8) ->
     elif oom_failures >= 1:
         likely_issue = "vram_pressure"
         recommended_fix = "Reduce memory pressure or increase available VRAM so the backend can complete training and evaluation."
+    elif isinstance(avg_peak_vram_ratio, (int, float)) and completed_with_scores >= 2 and avg_peak_vram_ratio <= 0.2:
+        likely_issue = "vram_headroom"
+        recommended_fix = "Consider increasing batch size or model capacity so the lab can use more of the available GPU memory."
     elif startup_failures >= 2:
         likely_issue = "startup_progress_detection"
         recommended_fix = "Expose startup progress earlier or relax startup detection for this backend."
@@ -436,6 +457,11 @@ def build_science_debug_summary(candidates_dir: Path, recent_window: int = 8) ->
             "oom_failures": oom_failures,
             "full_budget_training_without_result": full_budget_training_without_result,
             "late_training_stalls": late_training_stalls,
+        },
+        "vram": {
+            "gpu_memory_total_gb": gpu_total_gb,
+            "avg_peak_vram_mb": avg_peak_vram_mb,
+            "avg_peak_vram_ratio": avg_peak_vram_ratio,
         },
         "likely_issue": likely_issue,
         "recommended_fix": recommended_fix,

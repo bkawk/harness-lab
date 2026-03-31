@@ -134,6 +134,7 @@ def build_human_feedback(memory_dir: Path) -> dict:
     hindsight = read_hindsight(memory_dir)
     policy = read_policy(memory_dir)
     science_summary = read_json(memory_dir / "science_summary.json") if (memory_dir / "science_summary.json").exists() else {}
+    science_debug = read_json(memory_dir / "science_debug_summary.json") if (memory_dir / "science_debug_summary.json").exists() else {}
     responses_payload = read_human_feedback_responses(memory_dir)
     response_by_kind = {
         str(item.get("kind", "")).strip(): item
@@ -246,6 +247,31 @@ def build_human_feedback(memory_dir: Path) -> dict:
                 "priority": _score_item(leverage=5, urgency=5, recurrence=3, cost=4),
                 "confidence": 0.88,
                 "source": "hindsight",
+            }
+        )
+    vram_debug = science_debug.get("vram", {}) if isinstance(science_debug, dict) else {}
+    avg_peak_vram_ratio = vram_debug.get("avg_peak_vram_ratio")
+    avg_peak_vram_mb = vram_debug.get("avg_peak_vram_mb")
+    completed_with_scores = int((science_debug.get("counts", {}) or {}).get("completed_with_scores", 0) or 0) if isinstance(science_debug, dict) else 0
+    if (
+        oom_count == 0
+        and isinstance(avg_peak_vram_ratio, (int, float))
+        and isinstance(avg_peak_vram_mb, (int, float))
+        and completed_with_scores >= 2
+        and float(avg_peak_vram_ratio) <= 0.2
+    ):
+        items.append(
+            {
+                "kind": "vram_headroom",
+                "summary": "Consider increasing batch size or model capacity so the science backend uses more of the available VRAM.",
+                "why_now": (
+                    f"Recent real-backend runs are averaging about {float(avg_peak_vram_mb):.1f} MB of peak VRAM, "
+                    f"which is only about {float(avg_peak_vram_ratio) * 100:.1f}% of the available GPU memory."
+                ),
+                "evidence": ["artifacts/memory/science_debug_summary.json", "artifacts/memory/hardware_profile.json"],
+                "priority": _score_item(leverage=3, urgency=2, recurrence=2, cost=2),
+                "confidence": 0.72,
+                "source": "science_debug",
             }
         )
 
