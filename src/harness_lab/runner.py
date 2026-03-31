@@ -20,6 +20,8 @@ from harness_lab.simulator import simulate_candidate_outcome
 
 STALE_TIMEOUT_DEFAULT = 600  # seconds before a command backend process is killed
 EARLY_CRASH_THRESHOLD = 5.0  # seconds — anything shorter is "crashed_early"
+STARTUP_TIMEOUT_DEFAULT = 45.0  # seconds before a backend with no visible startup progress is terminated
+NO_PROGRESS_TIMEOUT_DEFAULT = 180.0  # seconds without stdout/stderr/result activity before termination
 
 
 def utc_now() -> str:
@@ -85,6 +87,30 @@ def classify_process_behavior(
         "duration_seconds": round(duration_seconds, 3),
         "returncode": returncode,
         "poll_count_estimate": max(1, int(duration_seconds / max(poll_interval_seconds, 0.01))),
+    }
+
+
+def inspect_command_progress(
+    stdout_path: Path,
+    stderr_path: Path,
+    result_path: Path,
+) -> dict:
+    def _size(path: Path) -> int:
+        return path.stat().st_size if path.exists() else 0
+
+    stdout_bytes = _size(stdout_path)
+    stderr_bytes = _size(stderr_path)
+    result_exists = result_path.exists()
+    activity_markers = []
+    for path in (stdout_path, stderr_path, result_path):
+        if path.exists():
+            activity_markers.append(path.stat().st_mtime)
+    return {
+        "stdout_bytes": stdout_bytes,
+        "stderr_bytes": stderr_bytes,
+        "result_exists": result_exists,
+        "saw_output": (stdout_bytes + stderr_bytes) > 0,
+        "latest_activity_mtime": max(activity_markers) if activity_markers else None,
     }
 
 
@@ -185,6 +211,10 @@ def _write_live_status(
     pid: int | None,
     poll_interval_seconds: float,
     last_poll_at: str,
+    last_activity_at: str | None = None,
+    stdout_bytes: int | None = None,
+    stderr_bytes: int | None = None,
+    result_exists: bool | None = None,
     finished_at: str | None = None,
     returncode: int | None = None,
 ) -> None:
@@ -198,6 +228,14 @@ def _write_live_status(
         "poll_interval_seconds": poll_interval_seconds,
         "last_poll_at": last_poll_at,
     }
+    if last_activity_at is not None:
+        payload["last_activity_at"] = last_activity_at
+    if stdout_bytes is not None:
+        payload["stdout_bytes"] = stdout_bytes
+    if stderr_bytes is not None:
+        payload["stderr_bytes"] = stderr_bytes
+    if result_exists is not None:
+        payload["result_exists"] = result_exists
     if finished_at is not None:
         payload["finished_at"] = finished_at
     if returncode is not None:
@@ -428,8 +466,15 @@ def _run_command_backend(
     )
     poll_interval_seconds = float(os.environ.get("HARNESS_LAB_RUNNER_POLL_SECONDS", "1.0") or 1.0)
     stale_timeout = float(os.environ.get("HARNESS_LAB_RUNNER_STALE_SECONDS", str(STALE_TIMEOUT_DEFAULT)) or STALE_TIMEOUT_DEFAULT)
+    startup_timeout = float(os.environ.get("HARNESS_LAB_RUNNER_STARTUP_SECONDS", str(STARTUP_TIMEOUT_DEFAULT)) or STARTUP_TIMEOUT_DEFAULT)
+    no_progress_timeout = float(
+        os.environ.get("HARNESS_LAB_RUNNER_NO_PROGRESS_SECONDS", str(NO_PROGRESS_TIMEOUT_DEFAULT)) or NO_PROGRESS_TIMEOUT_DEFAULT
+    )
     monotonic_start = time.monotonic()
     was_stalled = False
+    stall_reason = ""
+    last_progress_monotonic = monotonic_start
+    last_activity_iso = started_at
     with stdout_path.open("w", encoding="utf-8") as stdout_file, stderr_path.open("w", encoding="utf-8") as stderr_file:
         process = subprocess.Popen(
             command,
@@ -449,10 +494,18 @@ def _run_command_backend(
             pid=process.pid,
             poll_interval_seconds=poll_interval_seconds,
             last_poll_at=started_at,
+            last_activity_at=last_activity_iso,
+            stdout_bytes=0,
+            stderr_bytes=0,
+            result_exists=False,
         )
         while True:
             returncode = process.poll()
             now = utc_now()
+            progress = inspect_command_progress(stdout_path, stderr_path, result_path)
+            if progress["saw_output"] or progress["result_exists"]:
+                last_progress_monotonic = time.monotonic()
+                last_activity_iso = now
             if returncode is not None:
                 _write_live_status(
                     candidates_dir=candidates_dir,
@@ -464,13 +517,18 @@ def _run_command_backend(
                     pid=process.pid,
                     poll_interval_seconds=poll_interval_seconds,
                     last_poll_at=now,
+                    last_activity_at=last_activity_iso,
+                    stdout_bytes=progress["stdout_bytes"],
+                    stderr_bytes=progress["stderr_bytes"],
+                    result_exists=progress["result_exists"],
                     finished_at=now,
                     returncode=returncode,
                 )
                 break
             # --- Import 2: stale-process detection ---
             elapsed = time.monotonic() - monotonic_start
-            if elapsed >= stale_timeout:
+            no_progress_elapsed = time.monotonic() - last_progress_monotonic
+            if elapsed >= startup_timeout and not progress["saw_output"] and not progress["result_exists"]:
                 process.terminate()
                 try:
                     process.wait(timeout=5)
@@ -479,6 +537,7 @@ def _run_command_backend(
                     process.wait(timeout=5)
                 returncode = process.returncode
                 was_stalled = True
+                stall_reason = "startup_timeout"
                 _write_live_status(
                     candidates_dir=candidates_dir,
                     candidate_id=candidate_id,
@@ -489,6 +548,66 @@ def _run_command_backend(
                     pid=process.pid,
                     poll_interval_seconds=poll_interval_seconds,
                     last_poll_at=now,
+                    last_activity_at=last_activity_iso,
+                    stdout_bytes=progress["stdout_bytes"],
+                    stderr_bytes=progress["stderr_bytes"],
+                    result_exists=progress["result_exists"],
+                    finished_at=now,
+                    returncode=returncode,
+                )
+                break
+            if no_progress_elapsed >= no_progress_timeout:
+                process.terminate()
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait(timeout=5)
+                returncode = process.returncode
+                was_stalled = True
+                stall_reason = "no_progress_timeout"
+                _write_live_status(
+                    candidates_dir=candidates_dir,
+                    candidate_id=candidate_id,
+                    backend="command",
+                    command=command,
+                    started_at=started_at,
+                    status="stalled",
+                    pid=process.pid,
+                    poll_interval_seconds=poll_interval_seconds,
+                    last_poll_at=now,
+                    last_activity_at=last_activity_iso,
+                    stdout_bytes=progress["stdout_bytes"],
+                    stderr_bytes=progress["stderr_bytes"],
+                    result_exists=progress["result_exists"],
+                    finished_at=now,
+                    returncode=returncode,
+                )
+                break
+            if elapsed >= stale_timeout:
+                process.terminate()
+                try:
+                    process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait(timeout=5)
+                returncode = process.returncode
+                was_stalled = True
+                stall_reason = "stale_timeout"
+                _write_live_status(
+                    candidates_dir=candidates_dir,
+                    candidate_id=candidate_id,
+                    backend="command",
+                    command=command,
+                    started_at=started_at,
+                    status="stalled",
+                    pid=process.pid,
+                    poll_interval_seconds=poll_interval_seconds,
+                    last_poll_at=now,
+                    last_activity_at=last_activity_iso,
+                    stdout_bytes=progress["stdout_bytes"],
+                    stderr_bytes=progress["stderr_bytes"],
+                    result_exists=progress["result_exists"],
                     finished_at=now,
                     returncode=returncode,
                 )
@@ -503,6 +622,10 @@ def _run_command_backend(
                 pid=process.pid,
                 poll_interval_seconds=poll_interval_seconds,
                 last_poll_at=now,
+                last_activity_at=last_activity_iso,
+                stdout_bytes=progress["stdout_bytes"],
+                stderr_bytes=progress["stderr_bytes"],
+                result_exists=progress["result_exists"],
             )
             time.sleep(max(0.1, poll_interval_seconds))
 
@@ -513,7 +636,9 @@ def _run_command_backend(
         duration_seconds, returncode, poll_interval_seconds, stale_timeout,
     )
     if was_stalled:
-        proc_class["classification"] = "stalled"
+        proc_class["classification"] = stall_reason or "stalled"
+    proc_class["startup_timeout_seconds"] = startup_timeout
+    proc_class["no_progress_timeout_seconds"] = no_progress_timeout
 
     # --- Import 5: throughput accounting ---
     throughput = compute_throughput_accounting(
@@ -525,14 +650,19 @@ def _run_command_backend(
 
     if was_stalled:
         # Stalled processes get a structured outcome instead of raising
+        summary_map = {
+            "startup_timeout": "Backend produced no visible startup progress before the startup timeout and was terminated.",
+            "no_progress_timeout": "Backend stopped producing visible progress and was terminated before consuming the full budget.",
+            "stale_timeout": "Process exceeded stale timeout and was terminated.",
+        }
         outcome = update_outcome_for_candidate(
             candidates_dir,
             candidate_id,
             status="complete",
             outcome_label="stalled",
-            benchmark_summary="Process exceeded stale timeout and was terminated.",
+            benchmark_summary=summary_map.get(stall_reason, "Process exceeded stale timeout and was terminated."),
             audit_summary="",
-            observed_failure_modes=["stale_process"],
+            observed_failure_modes=[stall_reason or "stale_process"],
             evidence=[
                 f"trace:stdout:{stdout_path.name}",
                 f"trace:stderr:{stderr_path.name}",

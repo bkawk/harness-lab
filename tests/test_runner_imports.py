@@ -9,10 +9,13 @@ import pytest
 
 from harness_lab.runner import (
     EARLY_CRASH_THRESHOLD,
+    NO_PROGRESS_TIMEOUT_DEFAULT,
+    STARTUP_TIMEOUT_DEFAULT,
     STALE_TIMEOUT_DEFAULT,
     build_environment_preflight,
     build_preflight_bundle,
     classify_process_behavior,
+    inspect_command_progress,
     compute_throughput_accounting,
 )
 from harness_lab.workspace import create_candidate_workspace
@@ -136,6 +139,41 @@ class TestComputeThroughputAccounting:
         )
         assert result["early_completion_detected"] is True
         assert result["time_saved_estimate_seconds"] == 600.0
+
+
+# ---------------------------------------------------------------------------
+# inspect_command_progress
+# ---------------------------------------------------------------------------
+
+class TestInspectCommandProgress:
+    def test_reports_output_and_result_presence(self, tmp_path):
+        stdout_path = tmp_path / "stdout.log"
+        stderr_path = tmp_path / "stderr.log"
+        result_path = tmp_path / "result.json"
+        stdout_path.write_text("hello\n")
+        stderr_path.write_text("")
+        result_path.write_text("{}\n")
+
+        result = inspect_command_progress(stdout_path, stderr_path, result_path)
+        assert result["saw_output"] is True
+        assert result["result_exists"] is True
+        assert result["stdout_bytes"] > 0
+        assert result["latest_activity_mtime"] is not None
+
+    def test_reports_no_progress_for_empty_files(self, tmp_path):
+        stdout_path = tmp_path / "stdout.log"
+        stderr_path = tmp_path / "stderr.log"
+        result_path = tmp_path / "result.json"
+        stdout_path.write_text("")
+        stderr_path.write_text("")
+
+        result = inspect_command_progress(stdout_path, stderr_path, result_path)
+        assert result["saw_output"] is False
+        assert result["result_exists"] is False
+
+
+def test_timeout_constants_are_ordered():
+    assert STARTUP_TIMEOUT_DEFAULT < NO_PROGRESS_TIMEOUT_DEFAULT < STALE_TIMEOUT_DEFAULT
 
 
 # ---------------------------------------------------------------------------
