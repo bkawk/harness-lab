@@ -6,13 +6,13 @@ The GitHub repo is the lab dashboard.
 - status: `running`
 - vital_spark_at: `2026-03-31T10:12:12+00:00`
 - started_at: `2026-03-31T22:07:51+00:00`
-- last_heartbeat: `2026-03-31T22:17:54+00:00`
+- last_heartbeat: `2026-03-31T22:18:27+00:00`
 - cycles_completed: `1`
 - genesis seed: `cand_0001`
 - last candidate: `cand_0154`
 - last dataset: `abc_boundary512`
-- last commit: `-`
-- last publish message: `Publishing skipped.`
+- last commit: `d870443f10e874899c7a49208dcae4b456c30425`
+- last publish message: `Published d870443f10e874899c7a49208dcae4b456c30425 to origin/main.`
 - last cycle mode: `novelty_cycle`
 - novelty cycles triggered: `1`
 
@@ -29,7 +29,7 @@ The GitHub repo is the lab dashboard.
 - cycle mode: `novelty_cycle`
 
 ## Active Backend
-- active_candidate: `-`
+- active_candidate: `cand_0155`
 - backend_status: `-`
 - backend_pid: `-`
 - backend_started_at: `-`
