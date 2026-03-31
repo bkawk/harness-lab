@@ -10,13 +10,15 @@ import pytest
 from harness_lab.runner import (
     EARLY_CRASH_THRESHOLD,
     NO_PROGRESS_TIMEOUT_DEFAULT,
+    SCIENCE_EVAL_BUFFER_DEFAULT,
     STARTUP_TIMEOUT_DEFAULT,
     STALE_TIMEOUT_DEFAULT,
     build_environment_preflight,
     build_preflight_bundle,
     classify_process_behavior,
-    inspect_command_progress,
     compute_throughput_accounting,
+    infer_command_stale_timeout,
+    inspect_command_progress,
 )
 from harness_lab.workspace import create_candidate_workspace
 
@@ -188,6 +190,28 @@ class TestInspectCommandProgress:
 
 def test_timeout_constants_are_ordered():
     assert STARTUP_TIMEOUT_DEFAULT < NO_PROGRESS_TIMEOUT_DEFAULT < STALE_TIMEOUT_DEFAULT
+
+
+def test_infer_command_stale_timeout_uses_science_and_eval_budget():
+    env = {
+        "HARNESS_LAB_SCIENCE_TIME_BUDGET_SECONDS": "600",
+        "HARNESS_LAB_SCIENCE_EVAL_RESERVE_SECONDS": "120",
+    }
+    timeout = infer_command_stale_timeout(
+        ["bash", "-lc", "python3 scripts/repo_command_backend.py"],
+        env,
+        0.0,
+    )
+    assert timeout == 600 + 120 + SCIENCE_EVAL_BUFFER_DEFAULT
+
+
+def test_infer_command_stale_timeout_respects_explicit_override():
+    timeout = infer_command_stale_timeout(
+        ["bash", "-lc", "python3 scripts/repo_command_backend.py"],
+        {},
+        999.0,
+    )
+    assert timeout == 999.0
 
 
 # ---------------------------------------------------------------------------

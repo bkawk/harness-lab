@@ -63,7 +63,7 @@ Right now `harness-lab` can:
 - execute real external command backends through a stable result contract
 - detect backend readiness and let policy switch from simulation to a real command backend automatically
 - ship with a repo-native science backend so a fresh clone can train and score candidates without depending on other repos
-- run that real science backend on a realistic default `600` second wall-clock budget instead of toy-length probes
+- run that real science backend on a realistic default `600` second training budget plus a dedicated evaluation reserve instead of toy-length probes
 - reconcile outcomes back into diagnosis
 - write a hindsight artifact about what it should have done differently
 - use hindsight to influence parent ranking and next-step proposals

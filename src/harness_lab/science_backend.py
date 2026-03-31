@@ -42,6 +42,7 @@ class ScienceConfig:
     instance_margin: float = 0.35
     instance_modulation_scale: float = 0.1
     time_budget_seconds: int = 600
+    eval_reserve_seconds: int = 120
     transfer_smoke_min_score: float = 0.24
     transfer_smoke_max_gap: float = 0.03
     transfer_smoke_min_boundary_f1: float = 0.12
@@ -254,6 +255,9 @@ def derive_config(candidate_id: str, proposal: dict, diagnosis: dict) -> Science
     override = os.environ.get("HARNESS_LAB_SCIENCE_TIME_BUDGET_SECONDS", "").strip()
     if override:
         cfg = ScienceConfig(**{**asdict(cfg), "time_budget_seconds": int(float(override))})
+    eval_reserve_override = os.environ.get("HARNESS_LAB_SCIENCE_EVAL_RESERVE_SECONDS", "").strip()
+    if eval_reserve_override:
+        cfg = ScienceConfig(**{**asdict(cfg), "eval_reserve_seconds": int(float(eval_reserve_override))})
     return cfg
 
 
@@ -438,6 +442,8 @@ def run_science_backend(
         "config_ready",
         candidate_id=candidate_id,
         time_budget_seconds=cfg.time_budget_seconds,
+        eval_reserve_seconds=cfg.eval_reserve_seconds,
+        total_wall_clock_budget_seconds=cfg.time_budget_seconds + cfg.eval_reserve_seconds,
         batch_size=cfg.batch_size,
         eval_batch_size=cfg.eval_batch_size,
         hidden_dim=cfg.hidden_dim,
@@ -495,13 +501,20 @@ def run_science_backend(
 
     train_iter = iter(train_loader)
     start = time.time()
-    deadline = start + cfg.time_budget_seconds
+    train_deadline = start + cfg.time_budget_seconds
     steps = 0
     last_stats = {"loss": math.nan, "cls_loss": math.nan, "param_loss": math.nan, "boundary_loss": math.nan, "instance_loss": math.nan}
     last_progress_emit = start
-    write_science_progress(trace_dir, "training_started", candidate_id=candidate_id, deadline_seconds=cfg.time_budget_seconds)
+    write_science_progress(
+        trace_dir,
+        "training_started",
+        candidate_id=candidate_id,
+        train_budget_seconds=cfg.time_budget_seconds,
+        eval_reserve_seconds=cfg.eval_reserve_seconds,
+        total_wall_clock_budget_seconds=cfg.time_budget_seconds + cfg.eval_reserve_seconds,
+    )
 
-    while time.time() < deadline:
+    while time.time() < train_deadline:
         try:
             batch = next(train_iter)
         except StopIteration:
@@ -533,7 +546,7 @@ def run_science_backend(
                 candidate_id=candidate_id,
                 steps=steps,
                 elapsed_seconds=round(elapsed, 3),
-                remaining_seconds=max(0.0, round(deadline - now, 3)),
+                remaining_seconds=max(0.0, round(train_deadline - now, 3)),
                 loss=round(float(last_stats["loss"]), 6),
                 cls_loss=round(float(last_stats["cls_loss"]), 6),
                 param_loss=round(float(last_stats["param_loss"]), 6),
@@ -550,6 +563,7 @@ def run_science_backend(
         candidate_id=candidate_id,
         steps=steps,
         training_seconds=round(training_seconds, 3),
+        eval_reserve_seconds=cfg.eval_reserve_seconds,
         peak_vram_mb=peak_vram_mb(device),
     )
     write_science_progress(trace_dir, "benchmark_eval_started", candidate_id=candidate_id, steps=steps)

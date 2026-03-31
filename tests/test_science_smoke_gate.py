@@ -3,6 +3,7 @@ from __future__ import annotations
 from harness_lab.science_backend import (
     ScienceConfig,
     classify_smoke_block,
+    derive_config,
     should_run_full_audit,
 )
 
@@ -35,3 +36,10 @@ def test_smoke_block_classifies_promising_candidate_as_audit_blocked():
     assert outcome_label == "audit_blocked"
     assert failure_modes[0] == "transfer_smoke_failed"
 
+
+def test_derive_config_supports_eval_reserve_override(monkeypatch):
+    monkeypatch.setenv("HARNESS_LAB_SCIENCE_TIME_BUDGET_SECONDS", "600")
+    monkeypatch.setenv("HARNESS_LAB_SCIENCE_EVAL_RESERVE_SECONDS", "120")
+    cfg = derive_config("cand_0099", {"target": {}, "changes": []}, {})
+    assert cfg.time_budget_seconds == 600
+    assert cfg.eval_reserve_seconds == 120

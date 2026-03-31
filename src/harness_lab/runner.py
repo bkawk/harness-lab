@@ -22,6 +22,7 @@ STALE_TIMEOUT_DEFAULT = 600  # seconds before a command backend process is kille
 EARLY_CRASH_THRESHOLD = 5.0  # seconds — anything shorter is "crashed_early"
 STARTUP_TIMEOUT_DEFAULT = 45.0  # seconds before a backend with no visible startup progress is terminated
 NO_PROGRESS_TIMEOUT_DEFAULT = 180.0  # seconds without stdout/stderr/result activity before termination
+SCIENCE_EVAL_BUFFER_DEFAULT = 30.0  # extra wall-clock slack after eval reserve for teardown/result writing
 
 
 def utc_now() -> str:
@@ -136,6 +137,18 @@ def compute_throughput_accounting(
         "early_completion_detected": early,
         "time_saved_estimate_seconds": round(saved, 3),
     }
+
+
+def infer_command_stale_timeout(command: list[str], env: dict[str, str], configured_timeout: float) -> float:
+    """Give the repo-native science backend enough wall-clock headroom to finish eval and write results."""
+    if configured_timeout > 0:
+        return configured_timeout
+    command_text = " ".join(command)
+    if "repo_command_backend.py" not in command_text:
+        return STALE_TIMEOUT_DEFAULT
+    train_budget = float(env.get("HARNESS_LAB_SCIENCE_TIME_BUDGET_SECONDS", str(STALE_TIMEOUT_DEFAULT)) or STALE_TIMEOUT_DEFAULT)
+    eval_reserve = float(env.get("HARNESS_LAB_SCIENCE_EVAL_RESERVE_SECONDS", "120") or 120)
+    return train_budget + eval_reserve + SCIENCE_EVAL_BUFFER_DEFAULT
 
 
 def build_preflight_bundle(
@@ -472,7 +485,8 @@ def _run_command_backend(
         text=True,
     )
     poll_interval_seconds = float(os.environ.get("HARNESS_LAB_RUNNER_POLL_SECONDS", "1.0") or 1.0)
-    stale_timeout = float(os.environ.get("HARNESS_LAB_RUNNER_STALE_SECONDS", str(STALE_TIMEOUT_DEFAULT)) or STALE_TIMEOUT_DEFAULT)
+    configured_stale_timeout = float(os.environ.get("HARNESS_LAB_RUNNER_STALE_SECONDS", "0") or 0)
+    stale_timeout = infer_command_stale_timeout(command, env, configured_stale_timeout)
     startup_timeout = float(os.environ.get("HARNESS_LAB_RUNNER_STARTUP_SECONDS", str(STARTUP_TIMEOUT_DEFAULT)) or STARTUP_TIMEOUT_DEFAULT)
     no_progress_timeout = float(
         os.environ.get("HARNESS_LAB_RUNNER_NO_PROGRESS_SECONDS", str(NO_PROGRESS_TIMEOUT_DEFAULT)) or NO_PROGRESS_TIMEOUT_DEFAULT
