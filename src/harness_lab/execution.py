@@ -67,6 +67,7 @@ def _heuristic_execution_fields(
     benchmark_steps = [
         f"Apply proposed change to {mechanism or 'the harness under test'}.",
         "Run the local benchmark trace and capture raw logs under traces/.",
+        "Run a transfer-stability smoke slice before paying for the full audit.",
     ]
     if environment_hint:
         benchmark_steps.append(f"Adapt execution assumptions for environment: {environment_hint}.")
@@ -92,10 +93,11 @@ def _heuristic_execution_fields(
     audit_steps = []
     failure_signals = []
     if audit_required:
-        audit_steps.append("Run the audit path after benchmark if the candidate produces a plausible improvement.")
+        audit_steps.append("Run the audit path only if the transfer-stability smoke slice stays within the allowed gap.")
         audit_steps.append("Preserve audit outputs and compare them against the diagnosed parent failure.")
         failure_signals.append("Audit reproduces the same failure mode as the parent candidate.")
         failure_signals.append("Audit adds a new high-severity failure without offsetting benchmark evidence.")
+        failure_signals.append("Transfer-smoke pre-check fails and blocks the full audit.")
 
     trace_capture = [
         "proposal_application",

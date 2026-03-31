@@ -18,7 +18,7 @@ from harness_lab.science_data import (
     get_dataset_spec,
     load_metadata,
     make_dataloader,
-    make_eval_splits,
+    make_transfer_eval_splits,
     move_batch_to_device,
 )
 
@@ -41,12 +41,16 @@ class ScienceConfig:
     instance_margin: float = 0.35
     instance_modulation_scale: float = 0.1
     time_budget_seconds: int = 600
+    transfer_smoke_min_score: float = 0.24
+    transfer_smoke_max_gap: float = 0.03
+    transfer_smoke_min_boundary_f1: float = 0.12
 
 
 @dataclass(frozen=True)
 class ScienceRunResult:
     config: dict[str, object]
     benchmark_metrics: dict[str, float]
+    smoke_metrics: dict[str, float]
     audit_metrics: dict[str, float]
     training_seconds: float
     steps: int
@@ -315,6 +319,47 @@ def classify_outcome(benchmark_metrics: dict[str, float], audit_metrics: dict[st
     return "dead_end", ["no_gain"]
 
 
+def should_run_full_audit(
+    benchmark_metrics: dict[str, float],
+    smoke_metrics: dict[str, float],
+    cfg: ScienceConfig,
+) -> tuple[bool, list[str]]:
+    reasons: list[str] = []
+    benchmark = float(benchmark_metrics["val_score"])
+    smoke = float(smoke_metrics["val_score"])
+    gap = benchmark - smoke
+    boundary_f1 = float(smoke_metrics.get("boundary_f1", 0.0))
+
+    if benchmark < cfg.transfer_smoke_min_score:
+        reasons.append("benchmark_below_smoke_floor")
+    if smoke < cfg.transfer_smoke_min_score:
+        reasons.append("smoke_score_below_floor")
+    if gap > cfg.transfer_smoke_max_gap:
+        reasons.append("smoke_transfer_gap_too_wide")
+    if boundary_f1 < cfg.transfer_smoke_min_boundary_f1:
+        reasons.append("smoke_boundary_f1_too_low")
+    return (len(reasons) == 0, reasons)
+
+
+def classify_smoke_block(
+    benchmark_metrics: dict[str, float],
+    smoke_metrics: dict[str, float],
+    steps: int,
+    smoke_failure_reasons: list[str],
+) -> tuple[str, list[str]]:
+    if steps < 2:
+        return "train_error", ["undertrained"]
+    benchmark = float(benchmark_metrics["val_score"])
+    smoke = float(smoke_metrics["val_score"])
+    if benchmark >= 0.24:
+        return "audit_blocked", ["transfer_smoke_failed", *smoke_failure_reasons]
+    if float(smoke_metrics.get("boundary_f1", 0.0)) < 0.15:
+        return "dead_end", ["weak_boundary_f1", *smoke_failure_reasons]
+    if smoke < 0.20:
+        return "dead_end", ["smoke_no_gain", *smoke_failure_reasons]
+    return "audit_blocked", ["transfer_smoke_failed", *smoke_failure_reasons]
+
+
 def run_science_backend(
     *,
     candidate_id: str,
@@ -335,9 +380,10 @@ def run_science_backend(
     num_classes = len(spec.class_names)
 
     train_dataset = PackedShardDataset(dataset_root, "train")
-    benchmark_dataset, audit_dataset = make_eval_splits(dataset_root)
+    benchmark_dataset, smoke_dataset, audit_dataset = make_transfer_eval_splits(dataset_root)
     train_loader = make_dataloader(train_dataset, cfg.batch_size, shuffle=True, drop_last=True)
     benchmark_loader = make_dataloader(benchmark_dataset, cfg.eval_batch_size, shuffle=False)
+    smoke_loader = make_dataloader(smoke_dataset, cfg.eval_batch_size, shuffle=False)
     audit_loader = make_dataloader(audit_dataset, cfg.eval_batch_size, shuffle=False)
 
     model = CompactPointModel(
@@ -386,29 +432,48 @@ def run_science_backend(
 
     training_seconds = time.time() - start
     benchmark_metrics = evaluate_model(model, benchmark_loader, device, param_scale=param_scale, num_classes=num_classes)
-    audit_metrics = evaluate_model(model, audit_loader, device, param_scale=param_scale, num_classes=num_classes)
-    outcome_label, observed_failure_modes = classify_outcome(benchmark_metrics, audit_metrics, steps)
+    smoke_metrics = evaluate_model(model, smoke_loader, device, param_scale=param_scale, num_classes=num_classes)
+    full_audit_completed, smoke_failure_reasons = should_run_full_audit(benchmark_metrics, smoke_metrics, cfg)
+    if full_audit_completed:
+        audit_metrics = evaluate_model(model, audit_loader, device, param_scale=param_scale, num_classes=num_classes)
+        outcome_label, observed_failure_modes = classify_outcome(benchmark_metrics, audit_metrics, steps)
+    else:
+        audit_metrics = dict(smoke_metrics)
+        audit_metrics["audit_skipped_after_smoke"] = True
+        audit_metrics["smoke_failure_reasons"] = list(smoke_failure_reasons)
+        outcome_label, observed_failure_modes = classify_smoke_block(benchmark_metrics, smoke_metrics, steps, smoke_failure_reasons)
 
     benchmark_summary = (
         f"Real science backend trained {candidate_id} for {training_seconds:.1f}s on {metadata['splits']['train'][0]['path'].split('/')[0] if metadata.get('splits') else 'train'} "
         f"and scored {benchmark_metrics['val_score']:.6f} on the benchmark validation slice."
     )
-    audit_summary = (
-        f"Audit slice score was {audit_metrics['val_score']:.6f} with macro_iou {audit_metrics['macro_iou']:.6f} "
-        f"and param_score {audit_metrics['param_score']:.6f}."
-    )
+    if full_audit_completed:
+        audit_summary = (
+            f"Audit slice score was {audit_metrics['val_score']:.6f} with macro_iou {audit_metrics['macro_iou']:.6f} "
+            f"and param_score {audit_metrics['param_score']:.6f}."
+        )
+    else:
+        audit_summary = (
+            f"Transfer smoke score was {smoke_metrics['val_score']:.6f}; full audit was skipped after smoke gate "
+            f"({', '.join(smoke_failure_reasons)})."
+        )
     evidence = [
         "backend:science",
         f"science:device:{device.type}",
         f"science:steps:{steps}",
         f"science:train_seconds:{training_seconds:.1f}",
         f"science:benchmark:{benchmark_metrics['val_score']:.6f}",
+        f"science:smoke:{smoke_metrics['val_score']:.6f}",
         f"science:audit:{audit_metrics['val_score']:.6f}",
+        f"science:full_audit_completed:{str(full_audit_completed).lower()}",
         f"science:transfer_gap:{(benchmark_metrics['val_score'] - audit_metrics['val_score']):.6f}",
+        f"science:smoke_gap:{(benchmark_metrics['val_score'] - smoke_metrics['val_score']):.6f}",
         f"science:benchmark_boundary_f1:{benchmark_metrics.get('boundary_f1', 0.0):.6f}",
+        f"science:smoke_boundary_f1:{smoke_metrics.get('boundary_f1', 0.0):.6f}",
         f"science:audit_boundary_f1:{audit_metrics.get('boundary_f1', 0.0):.6f}",
         f"science:train_samples:{len(train_dataset)}",
         f"science:val_benchmark_samples:{len(benchmark_dataset)}",
+        f"science:val_smoke_samples:{len(smoke_dataset)}",
         f"science:val_audit_samples:{len(audit_dataset)}",
     ]
 
@@ -418,8 +483,12 @@ def run_science_backend(
         json.dumps(
             {
                 "benchmark_metrics": benchmark_metrics,
+                "smoke_metrics": smoke_metrics,
                 "audit_metrics": audit_metrics,
+                "full_audit_completed": full_audit_completed,
+                "smoke_failure_reasons": smoke_failure_reasons,
                 "benchmark_audit_gap": float(benchmark_metrics["val_score"] - audit_metrics["val_score"]),
+                "benchmark_smoke_gap": float(benchmark_metrics["val_score"] - smoke_metrics["val_score"]),
                 "training_seconds": training_seconds,
                 "steps": steps,
                 "peak_vram_mb": peak_vram_mb(device),
@@ -436,6 +505,7 @@ def run_science_backend(
     return ScienceRunResult(
         config=asdict(cfg),
         benchmark_metrics=benchmark_metrics,
+        smoke_metrics=smoke_metrics,
         audit_metrics=audit_metrics,
         training_seconds=training_seconds,
         steps=steps,
