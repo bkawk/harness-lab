@@ -6,18 +6,18 @@ The GitHub repo is the lab dashboard.
 - status: `running`
 - vital_spark_at: `2026-03-31T10:12:12+00:00`
 - started_at: `2026-03-31T11:03:54+00:00`
-- last_heartbeat: `2026-03-31T11:13:56+00:00`
-- cycles_completed: `1`
+- last_heartbeat: `2026-03-31T11:24:30+00:00`
+- cycles_completed: `2`
 - genesis seed: `cand_0001`
-- last candidate: `cand_0007`
+- last candidate: `cand_0008`
 - last dataset: `abc_boundary512`
 - last commit: `-`
 - last publish message: `Publishing skipped.`
 - last cycle mode: `novelty_cycle`
-- novelty cycles triggered: `1`
+- novelty cycles triggered: `2`
 
 ## Latest Step
-- candidate: `cand_0007`
+- candidate: `cand_0008`
 - dataset: `abc_boundary512` via `reused_prepared_dataset`
 - seed action: `existing`
 - proposal status: `candidate`
@@ -29,26 +29,26 @@ The GitHub repo is the lab dashboard.
 - cycle mode: `novelty_cycle`
 
 ## Recent Candidates
+- `cand_0008`: outcome `keeper`; diagnosis `complete`; benchmark `0.32574714077255956`
 - `cand_0007`: outcome `audit_blocked`; diagnosis `complete`; benchmark `0.382538488978586`
 - `cand_0006`: outcome `-`; diagnosis `empty`; benchmark `None`
 - `cand_0005`: outcome `improved`; diagnosis `complete`; benchmark `0.2932505653803283`
 - `cand_0004`: outcome `-`; diagnosis `empty`; benchmark `None`
-- `cand_0003`: outcome `audit_blocked`; diagnosis `complete`; benchmark `0.36470791859428353`
 
 ## Science Leaders
 - best benchmark: `cand_0007` -> `0.382538488978586`
 - best audit: `cand_0003` -> `0.33766418014737687`
-- tightest transfer: `cand_0002` -> gap `-0.011832617593061645`
+- tightest transfer: `cand_0008` -> gap `0.00592187393956084`
 - best stable: `cand_0002` -> audit `0.32560572881739014`
 
 ## Science Trend
-- summary: `Across the last 3 scored candidates, benchmark averaged 0.346832, audit averaged 0.321173, and the mean transfer gap was 0.025659.`
-- recent benchmark avg: `0.34683232431773264`
-- recent audit avg: `0.3211731741602715`
-- recent transfer gap avg: `0.025659150157461046`
+- summary: `Across the last 3 scored candidates, benchmark averaged 0.333845, audit averaged 0.315227, and the mean transfer gap was 0.018619.`
+- recent benchmark avg: `0.33384539837715793`
+- recent audit avg: `0.3152268697221455`
+- recent transfer gap avg: `0.01861852865501244`
+- `cand_0008`: benchmark `0.32574714077255956`, audit `0.3198252668329987`, gap `0.00592187393956084`
 - `cand_0007`: benchmark `0.382538488978586`, audit `0.31839459354361344`, gap `0.06414389543497256`
 - `cand_0005`: benchmark `0.2932505653803283`, audit `0.3074607487898244`, gap `-0.014210183409496091`
-- `cand_0003`: benchmark `0.36470791859428353`, audit `0.33766418014737687`, gap `0.027043738446906662`
 
 ## Hindsight
 - summary: `The lab saw 3 audit-blocked outcomes; it should have emphasized transfer-stability checks earlier.`
@@ -77,12 +77,10 @@ The GitHub repo is the lab dashboard.
 ## External Review
 - status: `idle`
 - trigger_reason: `-`
-- reviewer: `heuristic`
-- summary: `After 5 candidates, the lab requested peer review because `forced_review` fired. Current policy mode is `balanced`.`
-- lab advice: `Promote backend change type `budget_policy_changed` because hindsight says it is promising and under-explored.`
-- lab advice: `Promote backend change type `fusion_changed` because hindsight says it is promising and under-explored.`
-- human advice: `Consider strengthening the non-self-evolving seed around `local_only_gain` if that failure mode keeps dominating.`
-- human advice: `Consider exposing `initial_harness` as a more explicit evolvable backend module if it keeps dominating search.`
+- reviewer: `none`
+- summary: `No external review yet.`
+- lab advice: `No live external advice.`
+- human advice: `No human-facing advice.`
 
 ## Diversity
 - summary: `The lab has stayed on `initial_harness` for 6 recent candidates; inject a novelty step.`
