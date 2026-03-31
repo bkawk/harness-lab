@@ -46,6 +46,10 @@ changing decisions.
 The LLM becomes the decision-maker for search strategy. Heuristics become
 fallback validators.
 
+Current status:
+- bounded external review via `claude -p` is implemented with heuristic fallback
+- proposal authoring now has the same shape: optional Claude-authored `rationale`, `target`, and `changes`, with the existing heuristic draft preserved as fallback
+
 ### What the LLM does
 
 1. **Authors proposals holistically** — reads the full bootstrap snapshot (parent

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -10,6 +12,7 @@ from harness_lab.diversity import read_diversity
 from harness_lab.external_review import read_external_review
 from harness_lab.hardware import read_hardware_profile
 from harness_lab.hindsight import read_hindsight
+from harness_lab.llm import run_claude_json
 from harness_lab.memory import build_candidate_index, read_json
 from harness_lab.policy import read_policy
 from harness_lab.synthesis import synthesize_parent_candidates
@@ -396,6 +399,114 @@ def _branching_mode_change_items(branching_mode: str, chosen_mechanism: str, lat
     return ()
 
 
+def _llm_proposal_prompt(
+    *,
+    bootstrap_snapshot: dict,
+    parent_diagnosis: dict,
+    parent_summary: dict,
+    branching_mode: str,
+    fallback_target: dict,
+    fallback_changes: tuple[dict, ...],
+    fallback_rationale: str,
+) -> str:
+    payload = {
+        "bootstrap_snapshot": bootstrap_snapshot,
+        "parent_diagnosis": {
+            "summary": parent_diagnosis.get("summary", ""),
+            "mechanism": parent_diagnosis.get("mechanism", ""),
+            "failure_modes": parent_diagnosis.get("failure_modes", []),
+            "counterfactuals": parent_diagnosis.get("counterfactuals", [])[:5],
+        },
+        "parent_summary": {
+            "candidate_id": parent_summary.get("candidate_id", ""),
+            "diagnosis_mechanism": parent_summary.get("diagnosis_mechanism", ""),
+            "expected_failure_mode": parent_summary.get("expected_failure_mode", ""),
+            "backend_fingerprints": parent_summary.get("backend_fingerprints", []),
+            "benchmark_score": parent_summary.get("benchmark_score"),
+            "audit_score": parent_summary.get("audit_score"),
+        },
+        "branching_mode": branching_mode,
+        "fallback_draft": {
+            "rationale": fallback_rationale,
+            "target": fallback_target,
+            "changes": list(fallback_changes),
+        },
+    }
+    return (
+        "You are authoring a bounded harness-lab proposal.\n"
+        "Return only JSON with keys: rationale, target, changes.\n"
+        "target must be an object with keys: harness_component, expected_failure_mode, novelty_basis.\n"
+        "changes must be an array of objects with keys: kind, mechanism, summary.\n"
+        "Keep the proposal concrete, short, and grounded in the supplied evidence.\n"
+        "Do not mutate files or mention implementation details outside the proposal JSON.\n\n"
+        f"{json.dumps(payload, indent=2, sort_keys=True)}"
+    )
+
+
+def _normalize_llm_proposal_payload(payload: dict, fallback_target: dict, fallback_changes: tuple[dict, ...], fallback_rationale: str) -> tuple[str, dict, tuple[dict, ...]] | None:
+    if not isinstance(payload, dict):
+        return None
+    rationale = str(payload.get("rationale", "")).strip()
+    target_payload = payload.get("target", {})
+    if not isinstance(target_payload, dict):
+        target_payload = {}
+    target = {
+        "harness_component": str(target_payload.get("harness_component", fallback_target.get("harness_component", ""))).strip(),
+        "expected_failure_mode": str(target_payload.get("expected_failure_mode", fallback_target.get("expected_failure_mode", ""))).strip(),
+        "novelty_basis": str(target_payload.get("novelty_basis", fallback_target.get("novelty_basis", ""))).strip(),
+    }
+    changes: list[dict] = []
+    for item in payload.get("changes", []):
+        if not isinstance(item, dict):
+            continue
+        summary = str(item.get("summary", "")).strip()
+        if not summary:
+            continue
+        kind = str(item.get("kind", "llm_proposal")).strip() or "llm_proposal"
+        mechanism = str(item.get("mechanism", target["harness_component"])).strip() or target["harness_component"]
+        changes.append({"kind": kind, "mechanism": mechanism, "summary": summary})
+    if not rationale:
+        return None
+    if not target["harness_component"]:
+        target["harness_component"] = str(fallback_target.get("harness_component", "")).strip()
+    if not target["novelty_basis"]:
+        target["novelty_basis"] = str(fallback_target.get("novelty_basis", "")).strip()
+    if not changes:
+        changes = list(fallback_changes)
+    return rationale, target, tuple(changes[:8])
+
+
+def _maybe_llm_author_proposal(
+    *,
+    candidate_root: Path,
+    bootstrap_snapshot: dict,
+    parent_diagnosis: dict,
+    parent_summary: dict,
+    branching_mode: str,
+    fallback_target: dict,
+    fallback_changes: tuple[dict, ...],
+    fallback_rationale: str,
+) -> tuple[str, dict, tuple[dict, ...]]:
+    if str(os.environ.get("HARNESS_LAB_LLM_PROPOSAL_ENABLED", "")).strip().lower() not in {"1", "true", "yes"}:
+        return fallback_rationale, fallback_target, fallback_changes
+    payload = run_claude_json(
+        _llm_proposal_prompt(
+            bootstrap_snapshot=bootstrap_snapshot,
+            parent_diagnosis=parent_diagnosis,
+            parent_summary=parent_summary,
+            branching_mode=branching_mode,
+            fallback_target=fallback_target,
+            fallback_changes=fallback_changes,
+            fallback_rationale=fallback_rationale,
+        ),
+        cwd=candidate_root,
+    )
+    normalized = _normalize_llm_proposal_payload(payload or {}, fallback_target, fallback_changes, fallback_rationale)
+    if not normalized:
+        return fallback_rationale, fallback_target, fallback_changes
+    return normalized
+
+
 def draft_proposal_for_candidate(
     candidates_dir: Path,
     candidate_id: str,
@@ -426,6 +537,7 @@ def draft_proposal_for_candidate(
         dataset_id=dataset_id,
         synthesis=synthesis,
     )
+    bootstrap_snapshot = read_json(bootstrap_path)
 
     if chosen_parent is None:
         mechanism = "initial_harness"
@@ -448,17 +560,28 @@ def draft_proposal_for_candidate(
                     "summary": "Begin with a deliberately simple but real backend baseline before branching into richer candidate families.",
                 },
             )
+        target = {
+            "harness_component": mechanism,
+            "expected_failure_mode": "",
+            "novelty_basis": "genesis real-backend baseline with no prior candidate lineage",
+        }
+        rationale, target, changes = _maybe_llm_author_proposal(
+            candidate_root=candidate_root,
+            bootstrap_snapshot=bootstrap_snapshot,
+            parent_diagnosis={},
+            parent_summary={},
+            branching_mode="genesis",
+            fallback_target=target,
+            fallback_changes=changes,
+            fallback_rationale=rationale,
+        )
         draft = DraftProposal(
             candidate_id=candidate_id,
             parent_id=None,
             dataset_id=dataset_id,
             status="candidate",
             rationale=rationale,
-            target={
-                "harness_component": mechanism,
-                "expected_failure_mode": "",
-                "novelty_basis": "genesis real-backend baseline with no prior candidate lineage",
-            },
+            target=target,
             changes=changes,
             memory_context={
                 "parent_created_at": "",
@@ -511,17 +634,28 @@ def draft_proposal_for_candidate(
         rationale = f"{rationale} Budget forced a broader jump away from the most recent exhausted line."
     elif branching_mode == "focus_promising":
         rationale = f"{rationale} Budget says to stay close to the most promising active line."
+    target = {
+        "harness_component": mechanism or str(parent_summary.get("harness_component", "")).strip(),
+        "expected_failure_mode": failure_modes[0] if failure_modes else str(parent_summary.get("expected_failure_mode", "")).strip(),
+        "novelty_basis": _novelty_basis_from_memory(index, parent_summary, parent_diagnosis),
+    }
+    rationale, target, changes = _maybe_llm_author_proposal(
+        candidate_root=candidate_root,
+        bootstrap_snapshot=bootstrap_snapshot,
+        parent_diagnosis=parent_diagnosis,
+        parent_summary=parent_summary,
+        branching_mode=branching_mode,
+        fallback_target=target,
+        fallback_changes=changes,
+        fallback_rationale=rationale,
+    )
     draft = DraftProposal(
         candidate_id=candidate_id,
         parent_id=chosen_parent,
         dataset_id=dataset_id,
         status="candidate",
         rationale=rationale,
-        target={
-            "harness_component": mechanism or str(parent_summary.get("harness_component", "")).strip(),
-            "expected_failure_mode": failure_modes[0] if failure_modes else str(parent_summary.get("expected_failure_mode", "")).strip(),
-            "novelty_basis": _novelty_basis_from_memory(index, parent_summary, parent_diagnosis),
-        },
+        target=target,
         changes=changes,
         memory_context={
             "parent_created_at": str(parent_workspace.get("created_at", "")),

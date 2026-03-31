@@ -1,0 +1,106 @@
+from __future__ import annotations
+
+from harness_lab import proposal as proposal_module
+from harness_lab.workspace import create_candidate_workspace, write_json
+
+
+def _seed_parent(tmp_path):
+    candidates_dir = tmp_path / "candidates"
+    memory_dir = tmp_path / "memory"
+    candidates_dir.mkdir(parents=True, exist_ok=True)
+    memory_dir.mkdir(parents=True, exist_ok=True)
+
+    parent = create_candidate_workspace(candidates_dir, "cand_0001")
+    write_json(
+        parent.diagnosis_path,
+        {
+            "candidate_id": "cand_0001",
+            "created_at": parent.created_at,
+            "status": "complete",
+            "summary": "Parent drifted toward weak transfer.",
+            "severity": "medium",
+            "mechanism": "transfer_guard",
+            "failure_modes": ["audit_blocked"],
+            "evidence": [],
+            "counterfactuals": ["Try a smaller transfer-stability follow-up."],
+        },
+    )
+    write_json(
+        memory_dir / "candidate_index.json",
+        {
+            "candidate_count": 1,
+            "candidates": [
+                {
+                    "candidate_id": "cand_0001",
+                    "diagnosis_mechanism": "transfer_guard",
+                    "expected_failure_mode": "audit_blocked",
+                    "harness_component": "transfer_guard",
+                    "benchmark_score": 0.31,
+                    "audit_score": 0.27,
+                    "backend_fingerprints": ["fusion_changed"],
+                }
+            ],
+            "failure_mode_counts": {"audit_blocked": 1},
+            "diagnosis_mechanism_counts": {"transfer_guard": 1},
+            "backend_fingerprint_counts": {"fusion_changed": 1},
+        },
+    )
+    write_json(memory_dir / "science_summary.json", {"trend_summary": "", "leaders": {}, "recent_trend": {}})
+    return candidates_dir, memory_dir
+
+
+def test_llm_proposal_can_author_draft(tmp_path, monkeypatch):
+    candidates_dir, _memory_dir = _seed_parent(tmp_path)
+    monkeypatch.setenv("HARNESS_LAB_LLM_PROPOSAL_ENABLED", "1")
+    monkeypatch.setattr(
+        proposal_module,
+        "run_claude_json",
+        lambda prompt, *, cwd: {
+            "rationale": "Claude wants a tighter transfer-stability follow-up.",
+            "target": {
+                "harness_component": "transfer_guard",
+                "expected_failure_mode": "audit_blocked",
+                "novelty_basis": "test a narrower transfer guard around the parent failure",
+            },
+            "changes": [
+                {
+                    "kind": "llm_priority",
+                    "mechanism": "transfer_guard",
+                    "summary": "Favor a smaller transfer-stability move instead of a broad architecture jump.",
+                }
+            ],
+        },
+    )
+    monkeypatch.setattr(proposal_module, "choose_best_prepared_dataset", lambda memory_dir: {"dataset_id": "abc_boundary512_v64"})
+    monkeypatch.setattr(proposal_module, "get_dataset_record", lambda memory_dir, dataset_id: {"dataset_id": dataset_id, "status": "ready"})
+    monkeypatch.setattr(proposal_module, "read_hardware_profile", lambda memory_dir: {})
+    monkeypatch.setattr(proposal_module, "read_hindsight", lambda memory_dir: {"summary": "", "policy_adjustments": [], "over_explored_mechanisms": [], "under_explored_promising_mechanisms": [], "over_explored_backend_fingerprints": [], "under_explored_backend_fingerprints": []})
+    monkeypatch.setattr(proposal_module, "read_policy", lambda memory_dir: {"selection_mode": "balanced", "summary": ""})
+    monkeypatch.setattr(proposal_module, "read_budget", lambda memory_dir: {"exploration_mode": "balanced", "mechanism_budgets": []})
+    monkeypatch.setattr(proposal_module, "read_diversity", lambda memory_dir: {"novelty_step_recommended": False})
+    monkeypatch.setattr(proposal_module, "read_external_review", lambda memory_dir: {"status": "idle", "review_requested": False})
+    monkeypatch.setattr(proposal_module, "synthesize_parent_candidates", lambda candidates_dir: {"top_parent_id": "cand_0001", "ranked_parents": [{"candidate_id": "cand_0001"}]})
+
+    draft = proposal_module.draft_proposal_for_candidate(candidates_dir, "cand_0002")
+    assert draft.rationale == "Claude wants a tighter transfer-stability follow-up."
+    assert draft.target["harness_component"] == "transfer_guard"
+    assert draft.changes[0]["kind"] == "llm_priority"
+
+
+def test_invalid_llm_proposal_falls_back_to_heuristic(tmp_path, monkeypatch):
+    candidates_dir, _memory_dir = _seed_parent(tmp_path)
+    monkeypatch.setenv("HARNESS_LAB_LLM_PROPOSAL_ENABLED", "1")
+    monkeypatch.setattr(proposal_module, "run_claude_json", lambda prompt, *, cwd: {"changes": []})
+    monkeypatch.setattr(proposal_module, "choose_best_prepared_dataset", lambda memory_dir: {"dataset_id": "abc_boundary512_v64"})
+    monkeypatch.setattr(proposal_module, "get_dataset_record", lambda memory_dir, dataset_id: {"dataset_id": dataset_id, "status": "ready"})
+    monkeypatch.setattr(proposal_module, "read_hardware_profile", lambda memory_dir: {})
+    monkeypatch.setattr(proposal_module, "read_hindsight", lambda memory_dir: {"summary": "", "policy_adjustments": [], "over_explored_mechanisms": [], "under_explored_promising_mechanisms": [], "over_explored_backend_fingerprints": [], "under_explored_backend_fingerprints": []})
+    monkeypatch.setattr(proposal_module, "read_policy", lambda memory_dir: {"selection_mode": "balanced", "summary": ""})
+    monkeypatch.setattr(proposal_module, "read_budget", lambda memory_dir: {"exploration_mode": "balanced", "mechanism_budgets": []})
+    monkeypatch.setattr(proposal_module, "read_diversity", lambda memory_dir: {"novelty_step_recommended": False})
+    monkeypatch.setattr(proposal_module, "read_external_review", lambda memory_dir: {"status": "idle", "review_requested": False})
+    monkeypatch.setattr(proposal_module, "synthesize_parent_candidates", lambda candidates_dir: {"top_parent_id": "cand_0001", "ranked_parents": [{"candidate_id": "cand_0001"}]})
+
+    draft = proposal_module.draft_proposal_for_candidate(candidates_dir, "cand_0002")
+    assert "Parent drifted toward weak transfer." in draft.rationale
+    assert any(change["kind"] == "counterfactual" for change in draft.changes)
