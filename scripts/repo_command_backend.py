@@ -4,7 +4,6 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import subprocess
 import sys
 from pathlib import Path
 
@@ -36,6 +35,15 @@ def deterministic_seed(candidate_id: str, payload: str) -> int:
 def write_result(result_path: Path, payload: dict) -> None:
     result_path.parent.mkdir(parents=True, exist_ok=True)
     result_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def write_startup_marker(payload: dict) -> None:
+    marker_path = os.environ.get("HARNESS_LAB_STARTUP_MARKER_PATH", "").strip()
+    if not marker_path:
+        return
+    path = Path(marker_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
 def fallback_backend() -> None:
@@ -133,6 +141,15 @@ def main() -> None:
     candidate_dir = Path(os.environ["HARNESS_LAB_CANDIDATE_DIR"])
     result_path = Path(os.environ["HARNESS_LAB_RESULT_PATH"])
     dataset_path = os.environ.get("HARNESS_LAB_DATASET_PATH", "").strip()
+    write_startup_marker(
+        {
+            "candidate_id": os.environ["HARNESS_LAB_CANDIDATE_ID"],
+            "backend": "repo_command_backend",
+            "dataset_path": dataset_path,
+            "started": True,
+        }
+    )
+    print(f"repo-command-backend: starting {os.environ['HARNESS_LAB_CANDIDATE_ID']}", flush=True)
     if not dataset_path:
         fallback_backend()
         return

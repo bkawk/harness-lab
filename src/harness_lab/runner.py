@@ -94,6 +94,7 @@ def inspect_command_progress(
     stdout_path: Path,
     stderr_path: Path,
     result_path: Path,
+    startup_marker_path: Path | None = None,
 ) -> dict:
     def _size(path: Path) -> int:
         return path.stat().st_size if path.exists() else 0
@@ -101,14 +102,19 @@ def inspect_command_progress(
     stdout_bytes = _size(stdout_path)
     stderr_bytes = _size(stderr_path)
     result_exists = result_path.exists()
+    startup_marker_exists = startup_marker_path.exists() if startup_marker_path is not None else False
     activity_markers = []
-    for path in (stdout_path, stderr_path, result_path):
+    for path in (stdout_path, stderr_path, result_path, startup_marker_path):
+        if path is None:
+            continue
         if path.exists():
             activity_markers.append(path.stat().st_mtime)
     return {
         "stdout_bytes": stdout_bytes,
         "stderr_bytes": stderr_bytes,
         "result_exists": result_exists,
+        "startup_marker_exists": startup_marker_exists,
+        "startup_progress": startup_marker_exists or (stdout_bytes + stderr_bytes) > 0 or result_exists,
         "saw_output": (stdout_bytes + stderr_bytes) > 0,
         "latest_activity_mtime": max(activity_markers) if activity_markers else None,
     }
@@ -448,6 +454,7 @@ def _run_command_backend(
         "HARNESS_LAB_DIAGNOSIS_PATH": str(diagnosis_path),
         "HARNESS_LAB_OUTCOME_PATH": str(outcome_path),
         "HARNESS_LAB_RESULT_PATH": str(result_path),
+        "HARNESS_LAB_STARTUP_MARKER_PATH": str(candidate_dir / "traces" / "startup_marker.json"),
         "HARNESS_LAB_TRACE_DIR": str(candidate_dir / "traces"),
         "HARNESS_LAB_DATASET_ID": dataset_id,
         "HARNESS_LAB_DATASET_PATH": str(dataset_record.get("local_path", "")) if dataset_record else "",
@@ -475,6 +482,9 @@ def _run_command_backend(
     stall_reason = ""
     last_progress_monotonic = monotonic_start
     last_activity_iso = started_at
+    startup_marker_path = candidate_dir / "traces" / "startup_marker.json"
+    if startup_marker_path.exists():
+        startup_marker_path.unlink()
     with stdout_path.open("w", encoding="utf-8") as stdout_file, stderr_path.open("w", encoding="utf-8") as stderr_file:
         process = subprocess.Popen(
             command,
@@ -502,8 +512,8 @@ def _run_command_backend(
         while True:
             returncode = process.poll()
             now = utc_now()
-            progress = inspect_command_progress(stdout_path, stderr_path, result_path)
-            if progress["saw_output"] or progress["result_exists"]:
+            progress = inspect_command_progress(stdout_path, stderr_path, result_path, startup_marker_path)
+            if progress["startup_progress"]:
                 last_progress_monotonic = time.monotonic()
                 last_activity_iso = now
             if returncode is not None:
@@ -528,7 +538,7 @@ def _run_command_backend(
             # --- Import 2: stale-process detection ---
             elapsed = time.monotonic() - monotonic_start
             no_progress_elapsed = time.monotonic() - last_progress_monotonic
-            if elapsed >= startup_timeout and not progress["saw_output"] and not progress["result_exists"]:
+            if elapsed >= startup_timeout and not progress["startup_progress"]:
                 process.terminate()
                 try:
                     process.wait(timeout=5)
