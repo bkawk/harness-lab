@@ -49,6 +49,16 @@ def _compact_candidate(item: dict) -> dict:
     }
 
 
+def _read_science_progress(candidates_dir: Path, candidate_id: str) -> dict:
+    path = candidates_dir / candidate_id / "traces" / "science_progress.json"
+    if not path.exists():
+        return {}
+    payload = read_json(path)
+    if not isinstance(payload, dict):
+        return {}
+    return payload
+
+
 def build_decision_bundle(
     candidates_dir: Path,
     memory_dir: Path,
@@ -88,6 +98,7 @@ def build_decision_bundle(
         if "stale_process" in [str(mode).strip() for mode in item.get("observed_failure_modes", [])]
         or str(item.get("outcome_label", "")).strip() == "stalled"
     ]
+    science_progress = _read_science_progress(candidates_dir, candidate_id)
     children_by_parent = index.get("children_by_parent", {})
     lineage_focus = []
     for item in (synthesis or {}).get("ranked_parents", [])[:5]:
@@ -148,6 +159,14 @@ def build_decision_bundle(
             "failure_mode_counts": index.get("failure_mode_counts", {}),
             "outcome_label_counts": index.get("outcome_label_counts", {}),
             "children_by_parent": children_by_parent,
+        },
+        "science_progress": {
+            "phase": science_progress.get("phase", ""),
+            "updated_at": science_progress.get("updated_at", ""),
+            "steps": science_progress.get("steps"),
+            "elapsed_seconds": science_progress.get("elapsed_seconds"),
+            "remaining_seconds": science_progress.get("remaining_seconds"),
+            "peak_vram_mb": science_progress.get("peak_vram_mb"),
         },
     }
 
