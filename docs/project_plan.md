@@ -1,97 +1,265 @@
 # Project Plan
 
-## Goal
+## What `harness-lab` Is Now
 
-Build a new research lab oriented around Meta-Harness style optimization:
-- the proposer should inspect raw filesystem evidence
-- the search target should be the harness, not just a named strategy
-- the system should accumulate causal research memory, not only scores
+`harness-lab` is no longer a blank Meta-Harness-inspired scaffold.
+It is now a living research system with:
 
-## What We Are Not Doing
+- first-class candidate workspaces
+- source snapshots, diffs, traces, outcomes, and diagnosis
+- memory, hindsight, policy, budget, diversity, and human-feedback layers
+- a real repo-native science backend
+- a long-running `big-bang` supervisor
+- the GitHub repo acting as the main dashboard
+- bounded Claude participation in the strategic loop
 
-We are not copying `mesh-para` wholesale.
+The concrete research target is still the same:
+- learn systems that can map triangle meshes toward structured parametric or CAD-like representations
 
-We are intentionally not starting with:
-- old artifact trees
-- old strategy packs
-- old monitor assumptions
-- old boundary-centric search loops
+The repo is the harness for getting there, not the finished model.
 
-We will borrow ideas selectively rather than inherit everything.
+## Core Program
 
-## Core Principles
+The governing bet is still the Meta-Harness bet:
 
-1. Full-trace access
-- Every candidate should have a workspace containing source, logs, scores, diffs, and audit outputs.
+- preserve filesystem-native evidence instead of only scores
+- let the lab reason from traces, diffs, and lineage
+- evolve the harness as well as the model
+- keep a durable memory of what changed and why
 
-2. Harness-first search
-- Search over prompts, evaluation flow, memory selection, audit policy, context management, and model-side changes together.
+But the working stance now is sharper:
 
-3. Diagnosis before proposal
-- Proposal generation should start from explicit failure analysis grounded in raw traces.
+1. Build a strong enough seed backend for real science.
+2. Let the lab evolve search strategy around that backend.
+3. Then make the backend itself more directly evolvable.
 
-4. Cross-run synthesis
-- The lab should synthesize repeated motifs and recurring failure modes across many runs.
+So the program is not “more meta at all costs.”
+It is:
 
-5. Promotion with evidence
-- New strategies or families should be promoted through measurable gates rather than becoming permanent by accident.
+- evidence first
+- science second
+- autonomy only where the evidence can support it
 
-## Initial Architecture
+## Current Live State
 
-### 1. Candidate Workspace
-Each candidate should have a filesystem bundle with:
-- source snapshot
-- patch/diff against parent
-- execution trace
-- benchmark result
-- audit result
-- diagnosis notes
+Today the lab already has:
 
-### 2. Proposal Engine
-The proposer should consume:
-- recent candidate workspaces
-- selected historical workspaces
-- failure clusters
-- promotion memory
+- candidate bootstrap snapshots and richer decision bundles
+- polled command execution with live backend traces
+- external review with separate `lab_advice` and `human_advice`
+- `What The Lab Wants` and `What We Did`
+- bounded Claude-driven Tier 2 strategy integration
+- a realistic wall-clock training budget
+- repo-native ABC dataset acquisition and prepared dataset builds
+- named evaluation slices for benchmark, smoke, and audit-style evaluation
 
-It should output:
-- proposed harness change
-- explicit rationale
-- expected failure mode addressed
-- novelty vs prior work
+This means the main question is no longer “how do we scaffold the lab?”
+It is:
 
-### 3. Decision Layer
-The manager should rank candidates using:
-- expected gain
-- uncertainty
-- redundancy penalty
-- compute cost
-- transfer risk
+- how do we make the live loop more scientifically effective and more reliable?
 
-### 4. Memory Layer
-Memory should be queryable by:
-- failure mode
-- touched code region
-- audit outcome
-- proposal lineage
-- harness component
+## Immediate Priorities
 
-## First Build Steps
+### 1. Let science run and trust evidence more than instinct
 
-1. Define the candidate workspace layout.
-2. Build a candidate index so cross-run memory is queryable.
-3. Define a structured diagnosis artifact.
-4. Add a diagnosis update path so candidates accumulate causal judgment.
-5. Define a harness proposal format.
-6. Add a proposal drafting path that reads diagnosis and memory.
-7. Add a synthesis layer that ranks candidate parents explicitly.
-8. Add an execution-plan artifact so candidates carry benchmark and audit intent.
-9. Add an outcome artifact so execution writes back structured results.
-10. Add reconciliation so outcome evidence feeds diagnosis automatically.
-11. Allow controlled self-publishing of tracked lab evolution.
-12. Implement a filesystem-native proposer loop.
-13. Add a lightweight runner or simulator so the loop can produce outcomes without manual wiring.
-14. Separate the loop from specific backends through a runner interface.
-15. Make planning and execution hardware-aware so the lab adapts when machines change.
-16. Make dataset acquisition, build, and provenance part of the repo, not an implicit side dependency.
-17. Add promotion criteria for proposal -> candidate -> curated.
+The lab is now far enough along that the next improvements should be driven by:
+
+- candidate outcomes
+- human-feedback ranking
+- trend changes after interventions
+- whether recent fixes actually lower recurring requests
+
+That means we should increasingly:
+
+- implement the top human request
+- let the lab run
+- re-check whether the request fades or persists
+
+### 2. Stabilize `big-bang`
+
+The live loop still has intermittent stale-heartbeat / mid-cycle hang behavior.
+
+So a standing near-term priority is:
+
+- make the supervisor and publish path more robust
+- ensure stale or hung subprocesses cannot silently stall the repo dashboard
+- improve restart confidence
+
+### 3. Improve unresolved human bottlenecks
+
+The lab’s current human-facing requests are the best guide to what still sits outside the self-evolving loop.
+
+Typical examples:
+
+- evaluation / transfer stability pressure
+- backend startup and progress detection
+- dataset slice quality
+- later: explicit VRAM pressure if the evidence supports it
+
+## LLM Integration Roadmap
+
+### Tier 2: Bounded LLM search strategy
+
+Tier 2 is live and is the current operating mode.
+
+Claude can now participate, with heuristic fallback, in:
+
+- external review
+- proposal authoring
+- parent selection
+- diagnosis reconciliation
+- execution planning
+- hindsight synthesis
+- policy synthesis
+
+What remains programmatic:
+
+- candidate workspace creation
+- file I/O and JSON structure
+- evidence capture
+- subprocess management
+- the actual science backend execution
+- budgeting arithmetic
+- supervisor timing and publishing
+- dataset management
+
+Why Tier 2 is the right present stage:
+
+- it improves brittle search logic
+- it preserves safe fallbacks
+- it does not yet hand raw code mutation to the LLM
+
+### Tier 3: LLM writes science code
+
+Tier 3 is not live yet.
+
+This is the stage where the lab starts mutating backend science directly:
+
+- model structure
+- config derivation
+- loss behavior
+- semantic backend change summaries
+- outcome interpretation around scientific context
+
+Before Tier 3, we still want:
+
+- stronger validation and sandboxing for generated code
+- clearer modular backend boundaries
+- better hardware / memory evidence
+
+Important Tier 3 addition:
+
+- explicit VRAM and memory-pressure observability
+- peak VRAM
+- OOMs
+- memory-capped config downgrades
+
+That evidence should feed:
+
+- candidate traces
+- human feedback
+- future backend decisions
+
+### Tier 4: Iteration within a candidate
+
+Tier 4 is also not live yet.
+
+This is the stage where a candidate stops being a single-shot run and becomes a bounded mini-loop:
+
+- read mid-run traces
+- diagnose failure
+- attempt repair
+- re-run inside the same candidate budget
+
+This is powerful, but it raises:
+
+- cycle-time cost
+- complexity
+- data-model complexity for multi-run candidates
+- the risk of unstable self-evaluation
+
+So Tier 4 should follow only after Tier 3 has solid safety rails.
+
+## Backend Science Roadmap
+
+The backend science should not stay fixed.
+
+But it also should not be handed over to open-ended evolution too early.
+
+The right order is:
+
+1. strengthen the seed backend deliberately
+2. make the backend modular enough to evolve
+3. let the lab evolve it scientifically
+
+### Backend goals
+
+- reach rough scientific parity with the strongest old `mesh-para` ideas
+- keep the backend cleaner and more observable than the old stack
+- expose real scientific substructures the lab can later mutate
+
+### Backend roadmap
+
+1. Local geometry
+- maintain and improve neighborhood-aware local encoding
+
+2. Local/global fusion
+- strengthen how local and global geometry interact
+
+3. Class-conditioned instance behavior
+- continue refining structure-aware instance modulation
+
+4. Better metrics and outcome quality
+- transfer, boundary, class-slice, and drift-aware signals
+
+5. Modular backend structure
+- expose clearer units:
+  - local encoder
+  - fusion block
+  - loss recipe
+  - outcome classifier
+
+6. Backend-aware evidence
+- richer fingerprints
+- later semantic diff summaries
+- hardware / memory pressure evidence
+
+7. Backend-specific hindsight and promotion
+- let the lab reason about scientific mechanisms, not just generic parents
+
+## What We Are Explicitly Not Doing
+
+We are still not:
+
+- copying `mesh-para` wholesale
+- restoring the old monitor-app model as the main dashboard
+- giving the LLM unconstrained code control yet
+- treating every human intervention as fully resolved the moment it lands
+
+We want:
+
+- selective inheritance from `mesh-para`
+- bounded Claude participation
+- a repo-centered lab
+- unresolved problems to stay visible until evidence says they are truly improving
+
+## Success Criteria
+
+Near-term success:
+
+- `big-bang` runs reliably
+- the repo remains a truthful dashboard
+- the lab’s top requests change in response to real interventions
+- the science summary shows real keepers and better transfer behavior
+
+Medium-term success:
+
+- Tier 2 produces better strategic choices than heuristics alone
+- backend changes become more targeted and interpretable
+- the human-feedback queue becomes narrower and more specific over time
+
+Long-term success:
+
+- the backend itself becomes an evolvable scientific object
+- the lab improves faster than the older `mesh-para` loop did
+- the repo becomes a durable record of an actually learning research system
