@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from harness_lab.llm import run_claude_json
 from harness_lab.memory import read_json
 from harness_lab.workspace import write_json
 
@@ -84,20 +86,23 @@ def update_diagnosis(
     return updated
 
 
-def reconcile_diagnosis_from_outcome(candidates_dir: Path, candidate_id: str) -> DiagnosisUpdate:
-    diagnosis_path = diagnosis_path_for_candidate(candidates_dir, candidate_id)
-    outcome_path = candidates_dir / candidate_id / "outcome" / "result.json"
-    proposal_path = candidates_dir / candidate_id / "proposal.json"
-    if not diagnosis_path.exists():
-        raise FileNotFoundError(f"Diagnosis file not found: {diagnosis_path}")
-    if not outcome_path.exists():
-        raise FileNotFoundError(f"Outcome file not found: {outcome_path}")
+def _safe_read_json(path: Path) -> dict:
+    if not path.exists():
+        return {}
+    payload = read_json(path)
+    return payload if isinstance(payload, dict) else {}
 
-    diagnosis = read_json(diagnosis_path)
-    outcome = read_json(outcome_path)
-    proposal = read_json(proposal_path) if proposal_path.exists() else {}
-    target = proposal.get("target", {})
 
+def _safe_read_text(path: Path, limit: int = 4000) -> str:
+    if not path.exists():
+        return ""
+    text = path.read_text(encoding="utf-8", errors="replace")
+    if len(text) <= limit:
+        return text
+    return text[-limit:]
+
+
+def _heuristic_reconciled_fields(diagnosis: dict, outcome: dict, target: dict) -> dict:
     outcome_label = str(outcome.get("outcome_label", "")).strip()
     benchmark = outcome.get("benchmark", {})
     audit = outcome.get("audit", {})
@@ -130,14 +135,105 @@ def reconcile_diagnosis_from_outcome(candidates_dir: Path, candidate_id: str) ->
     if outcome_label in {"dead_end", "audit_blocked", "train_error"} and mechanism:
         counterfactuals = counterfactuals or [f"Revise {mechanism} with a smaller or better-instrumented follow-up."]
 
+    return {
+        "status": "complete" if str(outcome.get("status", "")) == "complete" else str(diagnosis.get("status", "in_progress")),
+        "summary": summary,
+        "severity": severity,
+        "mechanism": mechanism,
+        "failure_modes": observed_failure_modes or list(diagnosis.get("failure_modes", [])),
+        "evidence": evidence or list(diagnosis.get("evidence", [])),
+        "counterfactuals": [str(item) for item in counterfactuals if str(item).strip()],
+    }
+
+
+def _llm_diagnosis_prompt(candidate_id: str, proposal: dict, outcome: dict, heuristic_fields: dict, traces: dict) -> str:
+    payload = {
+        "candidate_id": candidate_id,
+        "proposal": {
+            "rationale": proposal.get("rationale", ""),
+            "target": proposal.get("target", {}),
+            "changes": proposal.get("changes", [])[:8],
+        },
+        "outcome": outcome,
+        "heuristic_fallback": heuristic_fields,
+        "traces": traces,
+    }
+    import json
+
+    return (
+        "You are reconciling a harness-lab diagnosis from outcome evidence.\n"
+        "Return only JSON with keys: summary, severity, mechanism, failure_modes, evidence, counterfactuals.\n"
+        "severity must be one of: unknown, low, medium, high, critical.\n"
+        "failure_modes, evidence, and counterfactuals must be arrays of strings.\n"
+        "Keep the diagnosis grounded in the provided proposal, outcome, and traces.\n\n"
+        f"{json.dumps(payload, indent=2, sort_keys=True)}"
+    )
+
+
+def _normalize_llm_diagnosis_payload(payload: dict, fallback: dict) -> dict | None:
+    if not isinstance(payload, dict):
+        return None
+    summary = str(payload.get("summary", "")).strip()
+    severity = str(payload.get("severity", fallback.get("severity", "unknown"))).strip()
+    if severity not in VALID_SEVERITY:
+        severity = str(fallback.get("severity", "unknown"))
+    mechanism = str(payload.get("mechanism", fallback.get("mechanism", ""))).strip()
+    failure_modes = [str(item).strip() for item in payload.get("failure_modes", []) if str(item).strip()]
+    evidence = [str(item).strip() for item in payload.get("evidence", []) if str(item).strip()]
+    counterfactuals = [str(item).strip() for item in payload.get("counterfactuals", []) if str(item).strip()]
+    if not summary:
+        return None
+    return {
+        "status": fallback.get("status", "complete"),
+        "summary": summary,
+        "severity": severity,
+        "mechanism": mechanism or str(fallback.get("mechanism", "")).strip(),
+        "failure_modes": failure_modes or list(fallback.get("failure_modes", [])),
+        "evidence": evidence or list(fallback.get("evidence", [])),
+        "counterfactuals": counterfactuals or list(fallback.get("counterfactuals", [])),
+    }
+
+
+def reconcile_diagnosis_from_outcome(candidates_dir: Path, candidate_id: str) -> DiagnosisUpdate:
+    diagnosis_path = diagnosis_path_for_candidate(candidates_dir, candidate_id)
+    outcome_path = candidates_dir / candidate_id / "outcome" / "result.json"
+    proposal_path = candidates_dir / candidate_id / "proposal.json"
+    if not diagnosis_path.exists():
+        raise FileNotFoundError(f"Diagnosis file not found: {diagnosis_path}")
+    if not outcome_path.exists():
+        raise FileNotFoundError(f"Outcome file not found: {outcome_path}")
+
+    diagnosis = read_json(diagnosis_path)
+    outcome = read_json(outcome_path)
+    proposal = read_json(proposal_path) if proposal_path.exists() else {}
+    target = proposal.get("target", {})
+    heuristic_fields = _heuristic_reconciled_fields(diagnosis, outcome, target)
+
+    llm_fields = heuristic_fields
+    if str(os.environ.get("HARNESS_LAB_LLM_DIAGNOSIS_ENABLED", "")).strip().lower() in {"1", "true", "yes"}:
+        candidate_dir = candidates_dir / candidate_id
+        traces = {
+            "science_metrics": _safe_read_json(candidate_dir / "traces" / "science_metrics.json"),
+            "backend_result": _safe_read_json(candidate_dir / "traces" / "backend_result.json"),
+            "runner_stdout_tail": _safe_read_text(candidate_dir / "traces" / "runner_stdout.log"),
+            "runner_stderr_tail": _safe_read_text(candidate_dir / "traces" / "runner_stderr.log"),
+        }
+        payload = run_claude_json(
+            _llm_diagnosis_prompt(candidate_id, proposal, outcome, heuristic_fields, traces),
+            cwd=candidate_dir,
+        )
+        normalized = _normalize_llm_diagnosis_payload(payload or {}, heuristic_fields)
+        if normalized:
+            llm_fields = normalized
+
     return update_diagnosis(
         candidates_dir,
         candidate_id,
-        status="complete" if str(outcome.get("status", "")) == "complete" else str(diagnosis.get("status", "in_progress")),
-        summary=summary,
-        severity=severity,
-        mechanism=mechanism,
-        failure_modes=observed_failure_modes or list(diagnosis.get("failure_modes", [])),
-        evidence=evidence or list(diagnosis.get("evidence", [])),
-        counterfactuals=[str(item) for item in counterfactuals if str(item).strip()],
+        status=str(llm_fields.get("status", heuristic_fields["status"])),
+        summary=str(llm_fields.get("summary", heuristic_fields["summary"])),
+        severity=str(llm_fields.get("severity", heuristic_fields["severity"])),
+        mechanism=str(llm_fields.get("mechanism", heuristic_fields["mechanism"])),
+        failure_modes=list(llm_fields.get("failure_modes", heuristic_fields["failure_modes"])),
+        evidence=list(llm_fields.get("evidence", heuristic_fields["evidence"])),
+        counterfactuals=list(llm_fields.get("counterfactuals", heuristic_fields["counterfactuals"])),
     )
