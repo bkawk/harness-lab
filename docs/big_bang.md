@@ -5,19 +5,19 @@ The GitHub repo is the lab dashboard.
 ## State
 - status: `running`
 - vital_spark_at: `2026-03-31T10:12:12+00:00`
-- started_at: `2026-03-31T20:39:47+00:00`
-- last_heartbeat: `2026-03-31T22:03:59+00:00`
-- cycles_completed: `8`
+- started_at: `2026-03-31T22:07:51+00:00`
+- last_heartbeat: `2026-03-31T22:17:54+00:00`
+- cycles_completed: `1`
 - genesis seed: `cand_0001`
-- last candidate: `cand_0152`
+- last candidate: `cand_0154`
 - last dataset: `abc_boundary512`
 - last commit: `-`
 - last publish message: `Publishing skipped.`
 - last cycle mode: `novelty_cycle`
-- novelty cycles triggered: `8`
+- novelty cycles triggered: `1`
 
 ## Latest Step
-- candidate: `cand_0152`
+- candidate: `cand_0154`
 - dataset: `abc_boundary512` via `reused_prepared_dataset`
 - seed action: `existing`
 - proposal status: `candidate`
@@ -37,11 +37,11 @@ The GitHub repo is the lab dashboard.
 - backend_poll_interval_seconds: `-`
 
 ## Recent Candidates
+- `cand_0154`: outcome `audit_blocked`; diagnosis `complete`; benchmark `0.32343279344879683`
+- `cand_0153`: outcome `-`; diagnosis `empty`; benchmark `None`
 - `cand_0152`: outcome `audit_blocked`; diagnosis `complete`; benchmark `0.39496752181409667`
 - `cand_0151`: outcome `improved`; diagnosis `complete`; benchmark `0.26770871194176465`
 - `cand_0150`: outcome `audit_blocked`; diagnosis `complete`; benchmark `0.35534037221492726`
-- `cand_0149`: outcome `audit_blocked`; diagnosis `complete`; benchmark `0.30120777875513016`
-- `cand_0148`: outcome `audit_blocked`; diagnosis `complete`; benchmark `0.3150746947604768`
 
 ## Science Leaders
 - best benchmark: `cand_0103` -> `0.448`
@@ -50,18 +50,17 @@ The GitHub repo is the lab dashboard.
 - best stable: `cand_0146` -> audit `0.3332486601124782`
 
 ## Science Trend
-- summary: `Across the last 5 scored candidates, benchmark averaged 0.326860, audit averaged 0.278731, and the mean transfer gap was 0.048129.`
-- recent benchmark avg: `0.32685981589727914`
-- recent audit avg: `0.2787311322671861`
-- recent transfer gap avg: `0.048128683630092976`
+- summary: `Across the last 4 scored candidates, benchmark averaged 0.335362, audit averaged 0.296941, and the mean transfer gap was 0.038421.`
+- recent benchmark avg: `0.3353623498548963`
+- recent audit avg: `0.29694101135495804`
+- recent transfer gap avg: `0.03842133849993831`
+- `cand_0154`: benchmark `0.32343279344879683`, audit `0.25183370946077877`, gap `0.07159908398801806`
 - `cand_0152`: benchmark `0.39496752181409667`, audit `0.3258159652988599`, gap `0.06915155651523675`
 - `cand_0151`: benchmark `0.26770871194176465`, audit `0.28926065356309705`, gap `-0.021551941621332393`
 - `cand_0150`: benchmark `0.35534037221492726`, audit `0.3208537170970964`, gap `0.03448665511783083`
-- `cand_0149`: benchmark `0.30120777875513016`, audit `0.20875717796650395`, gap `0.09245060078862621`
-- `cand_0148`: benchmark `0.3150746947604768`, audit `0.2489681474103733`, gap `0.06610654735010349`
 
 ## Hindsight
-- summary: `The lab saw 71 audit-blocked outcomes; it should have emphasized transfer-stability checks earlier.`
+- summary: `In the recent scored window, the lab saw 7 audit-blocked outcomes; it should emphasize transfer-stability checks.`
 - adjustment: `Raise priority for proposals that directly target transfer stability after an audit_blocked result.`
 
 ## Policy
@@ -82,6 +81,28 @@ The GitHub repo is the lab dashboard.
 - preferred_backend: `command`
 - available_backends: `command, simulated`
 - command_backend_configured: `True`
+
+## Backend Science
+- summary: `Recent backend evolution is concentrated in science_backend (47 candidate(s), avg transfer gap 0.039295).`
+- recommended_action: `wait`
+- target_module: `science_model`
+- problem: `Improve transfer-stability evaluation or smoke tests so promising candidates fail earlier before full audit.`
+- why_this_module: `Recent backend edits are concentrated in `science_model` with average transfer gap 0.039295. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation. Hold off on a mutation until the post-change sample is less thin. 0 scored candidate(s) have landed since structural commit `320fcac`.`
+- secondary_context: `Recent real-backend runs are only using about 593.4 MB on average, leaving most VRAM unused. 0 scored candidate(s) have landed since structural commit `320fcac`.`
+- scored_candidates_since_change: `0`
+- last_structural_commit: `320fcac`
+### Modular Levers
+- model: `science_model` (targeted); attempts `47`, audit_blocked `42`, avg_gap `0.03929456961376188`
+- loss: `science_loss` (available); attempts `32`, audit_blocked `28`, avg_gap `0.03957470666868141`
+- eval: `science_eval` (available); attempts `39`, audit_blocked `34`, avg_gap `0.03861904266833603`
+- config: `science_config` (available); attempts `32`, audit_blocked `28`, avg_gap `0.03957470666868141`
+- train: `science_train` (available); attempts `25`, audit_blocked `21`, avg_gap `0.03930302242689823`
+
+### Recent Module Evidence
+- `science_backend`: attempts `47`, audit_blocked `42`, avg_gap `0.03929456961376188`
+- `science_model`: attempts `47`, audit_blocked `42`, avg_gap `0.03929456961376188`
+- `science_eval`: attempts `39`, audit_blocked `34`, avg_gap `0.03861904266833603`
+- `science_config`: attempts `32`, audit_blocked `28`, avg_gap `0.03957470666868141`
 
 ## External Review
 - status: `idle`
