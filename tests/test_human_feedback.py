@@ -100,3 +100,40 @@ def test_human_feedback_lowers_priority_for_recently_addressed_requests(tmp_path
     assert items["ops"]["priority"] < 9
     assert payload["responses"][-1]["kind"] == "dataset"
     assert payload["responses"][0]["kind"] == "evaluation"
+
+
+def test_human_feedback_reescalates_addressed_ops_when_failures_persist(tmp_path, monkeypatch):
+    memory_dir = tmp_path / "memory"
+    memory_dir.mkdir(parents=True, exist_ok=True)
+    write_json(memory_dir / "external_review.json", {"status": "idle", "human_advice": []})
+    write_json(
+        memory_dir / "hindsight.json",
+        {
+            "top_outcomes": [{"label": "audit_blocked", "count": 2}],
+            "top_failure_modes": [{"label": "startup_timeout", "count": 12}],
+            "summary": "",
+            "hindsight_findings": [],
+            "policy_adjustments": [],
+        },
+    )
+    write_json(memory_dir / "policy.json", {"summary": ""})
+    write_json(memory_dir / "science_summary.json", {"leaders": {"best_stable": {"candidate_id": "cand_0009"}}})
+    monkeypatch.setattr(
+        human_feedback_module,
+        "read_human_feedback_responses",
+        lambda memory_dir: {
+            "summary": "The humans recently addressed 1 lab request(s).",
+            "responses": [
+                {
+                    "kind": "ops",
+                    "commit_sha": "a3c7559",
+                    "response_summary": "Hardened backend startup and no-progress detection.",
+                },
+            ],
+        },
+    )
+
+    payload = build_human_feedback(memory_dir)
+    ops_item = next(item for item in payload["items"] if item["kind"] == "ops")
+    assert ops_item["priority"] >= 9
+    assert "persists after" in ops_item["why_now"]

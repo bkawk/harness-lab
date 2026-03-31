@@ -171,6 +171,20 @@ class TestInspectCommandProgress:
         assert result["saw_output"] is False
         assert result["result_exists"] is False
 
+    def test_startup_marker_counts_as_progress(self, tmp_path):
+        stdout_path = tmp_path / "stdout.log"
+        stderr_path = tmp_path / "stderr.log"
+        result_path = tmp_path / "result.json"
+        startup_marker_path = tmp_path / "startup_marker.json"
+        stdout_path.write_text("")
+        stderr_path.write_text("")
+        startup_marker_path.write_text("{\"started\": true}\n")
+
+        result = inspect_command_progress(stdout_path, stderr_path, result_path, startup_marker_path)
+        assert result["saw_output"] is False
+        assert result["startup_marker_exists"] is True
+        assert result["startup_progress"] is True
+
 
 def test_timeout_constants_are_ordered():
     assert STARTUP_TIMEOUT_DEFAULT < NO_PROGRESS_TIMEOUT_DEFAULT < STALE_TIMEOUT_DEFAULT

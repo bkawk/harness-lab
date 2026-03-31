@@ -31,6 +31,12 @@ def _score_item(*, leverage: int, urgency: int, recurrence: int, cost: int) -> i
     return leverage + urgency + recurrence - cost
 
 
+def _response_discount(response: dict | None, *, persistence: bool, default_discount: int) -> int:
+    if not response:
+        return 0
+    return 0 if persistence else default_discount
+
+
 RESPONSE_RULES = (
     {
         "kind": "evaluation",
@@ -164,6 +170,7 @@ def build_human_feedback(memory_dir: Path) -> dict:
     audit_blocked_count = top_outcomes.get("audit_blocked", 0)
     if audit_blocked_count >= 3:
         response = response_by_kind.get("evaluation")
+        persistence = bool(response) and audit_blocked_count >= 6
         items.append(
             {
                 "kind": "evaluation",
@@ -171,14 +178,20 @@ def build_human_feedback(memory_dir: Path) -> dict:
                 "why_now": (
                     f"{audit_blocked_count} audit-blocked outcomes are dominating the frontier."
                     + (
-                        f" Recently addressed by {str(response.get('commit_sha', ''))[:7]}."
+                        f" The pressure persists after {str(response.get('commit_sha', ''))[:7]}."
+                        if persistence
+                        else f" Recently addressed by {str(response.get('commit_sha', ''))[:7]}."
                         if response
                         else ""
                     )
                 ),
                 "evidence": ["artifacts/memory/hindsight.json", "artifacts/memory/science_summary.json"],
-                "priority": max(1, _score_item(leverage=5, urgency=5, recurrence=4, cost=2) - (6 if response else 0)),
-                "confidence": 0.76,
+                "priority": max(
+                    1,
+                    _score_item(leverage=5, urgency=5, recurrence=4, cost=2)
+                    - _response_discount(response, persistence=persistence, default_discount=6),
+                ),
+                "confidence": 0.82 if persistence else 0.76,
                 "source": "hindsight",
                 "response": response or {},
             }
@@ -190,6 +203,7 @@ def build_human_feedback(memory_dir: Path) -> dict:
     if stale_process_count >= 1 or startup_issue_count >= 1 or no_progress_count >= 1:
         response = response_by_kind.get("ops")
         total_ops_failures = stale_process_count + startup_issue_count + no_progress_count
+        persistence = bool(response) and total_ops_failures >= 6
         items.append(
             {
                 "kind": "ops",
@@ -197,14 +211,20 @@ def build_human_feedback(memory_dir: Path) -> dict:
                 "why_now": (
                     f"The lab has already seen {total_ops_failures} startup/progress stall outcome(s)."
                     + (
-                        f" Recently addressed by {str(response.get('commit_sha', ''))[:7]}."
+                        f" The pressure persists after {str(response.get('commit_sha', ''))[:7]}."
+                        if persistence
+                        else f" Recently addressed by {str(response.get('commit_sha', ''))[:7]}."
                         if response
                         else ""
                     )
                 ),
                 "evidence": ["artifacts/memory/hindsight.json"],
-                "priority": max(1, _score_item(leverage=4, urgency=4, recurrence=3, cost=2) - (5 if response else 0)),
-                "confidence": 0.72,
+                "priority": max(
+                    1,
+                    _score_item(leverage=4, urgency=4, recurrence=3, cost=2)
+                    - _response_discount(response, persistence=persistence, default_discount=5),
+                ),
+                "confidence": 0.84 if persistence else 0.72,
                 "source": "hindsight",
                 "response": response or {},
             }
@@ -225,15 +245,32 @@ def build_human_feedback(memory_dir: Path) -> dict:
 
     policy_summary = str(policy.get("summary", "")).strip()
     if "transfer" in policy_summary.lower():
+        response = response_by_kind.get("dataset")
+        transfer_failure_count = top_failures.get("transfer_collapse", 0) + top_failures.get("transfer_regression", 0)
+        persistence = bool(response) and (audit_blocked_count >= 6 or transfer_failure_count >= 4)
         items.append(
             {
                 "kind": "dataset",
                 "summary": "Consider improving the validation split or transfer-oriented data slices so the lab can distinguish local wins from robust gains sooner.",
-                "why_now": "Current policy keeps steering toward transfer stability, which suggests the data/eval split is a recurring pressure point.",
+                "why_now": (
+                    "Current policy keeps steering toward transfer stability, which suggests the data/eval split is a recurring pressure point."
+                    + (
+                        f" The pressure persists after {str(response.get('commit_sha', ''))[:7]}."
+                        if persistence
+                        else f" Recently addressed by {str(response.get('commit_sha', ''))[:7]}."
+                        if response
+                        else ""
+                    )
+                ),
                 "evidence": ["artifacts/memory/policy.json", "artifacts/memory/science_summary.json"],
-                "priority": _score_item(leverage=4, urgency=3, recurrence=3, cost=3),
-                "confidence": 0.58,
+                "priority": max(
+                    1,
+                    _score_item(leverage=4, urgency=3, recurrence=3, cost=3)
+                    - _response_discount(response, persistence=persistence, default_discount=5),
+                ),
+                "confidence": 0.68 if persistence else 0.58,
                 "source": "policy",
+                "response": response or {},
             }
         )
 
