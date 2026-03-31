@@ -6,10 +6,10 @@ The GitHub repo is the lab dashboard.
 - status: `running`
 - vital_spark_at: `2026-03-31T10:12:12+00:00`
 - started_at: `2026-03-31T15:49:29+00:00`
-- last_heartbeat: `2026-03-31T15:51:32+00:00`
-- cycles_completed: `2`
+- last_heartbeat: `2026-03-31T15:52:51+00:00`
+- cycles_completed: `3`
 - genesis seed: `cand_0001`
-- last candidate: `cand_0045`
+- last candidate: `cand_0046`
 - last dataset: `abc_boundary512`
 - last commit: `-`
 - last publish message: `Publishing skipped.`
@@ -17,7 +17,7 @@ The GitHub repo is the lab dashboard.
 - novelty cycles triggered: `0`
 
 ## Latest Step
-- candidate: `cand_0045`
+- candidate: `cand_0046`
 - dataset: `abc_boundary512` via `reused_prepared_dataset`
 - seed action: `existing`
 - proposal status: `candidate`
@@ -37,11 +37,11 @@ The GitHub repo is the lab dashboard.
 - backend_poll_interval_seconds: `-`
 
 ## Recent Candidates
+- `cand_0046`: outcome `stalled`; diagnosis `complete`; benchmark `None`
 - `cand_0045`: outcome `stalled`; diagnosis `complete`; benchmark `None`
 - `cand_0044`: outcome `stalled`; diagnosis `complete`; benchmark `None`
 - `cand_0043`: outcome `stalled`; diagnosis `complete`; benchmark `None`
 - `cand_0042`: outcome `stalled`; diagnosis `complete`; benchmark `None`
-- `cand_0041`: outcome `stalled`; diagnosis `complete`; benchmark `None`
 
 ## Science Leaders
 - best benchmark: `cand_0013` -> `0.3847249926656351`
@@ -66,7 +66,7 @@ The GitHub repo is the lab dashboard.
 - cooldown_multiplier: `2.0`
 - preferred_runner_backend: `command`
 - publish_every_cycles: `1`
-- novelty_cycle_priority: `normal`
+- novelty_cycle_priority: `high`
 
 ## Budget
 - summary: `Mechanisms initial_harness, budget_policy_changed, fusion_changed exhausted their follow-up budget; broaden the search.`
@@ -100,6 +100,6 @@ The GitHub repo is the lab dashboard.
 - `evaluation` addressed by `930a088`: `Implemented a transfer-stability smoke gate before full audit.`
 
 ## Diversity
-- summary: `Recent branching still has room, but `initial_harness` is the current active line.`
-- current_mechanism_streak: `2`
-- novelty_step_recommended: `False`
+- summary: `The lab has stayed on `initial_harness` for 3 recent candidates; inject a novelty step.`
+- current_mechanism_streak: `3`
+- novelty_step_recommended: `True`

@@ -162,6 +162,12 @@ The LLM gains control over the science code itself, not just the search strategy
    transfer gap is shrinking and boundary F1 is strong — label it improving."
    (~1 call)
 
+5. **Surfaces memory pressure explicitly** — records peak VRAM, OOMs, and
+   memory-driven config downgrades so the lab can decide whether backend science
+   is being constrained by hardware rather than by the current model idea.
+   This should feed both human feedback and candidate evidence before the lab is
+   trusted to ask for more VRAM or re-shape the architecture around memory.
+
 ### What stays programmatic
 
 - PyTorch training loop structure (the loop stays fixed; the LLM mutates the
@@ -189,6 +195,9 @@ The LLM gains control over the science code itself, not just the search strategy
   dead ends, but the dead-end ratio may increase initially
 - **Determinism loss**: `derive_config` is currently deterministic; LLM-authored
   configs are stochastic
+- **False hardware diagnoses**: if VRAM evidence is not captured explicitly, the
+  lab may misread slow or stalled runs as architectural failures instead of
+  resource constraints
 
 ### Files changed
 
@@ -201,6 +210,10 @@ Everything from Tier 2, plus:
 - New: `src/harness_lab/mutation.py` — code mutation planning, generation,
   validation, application
 - New: `src/harness_lab/sandbox.py` — safety checks for LLM-generated code
+- `src/harness_lab/science_backend.py` — emit peak VRAM / OOM / memory-cap
+  evidence into candidate traces
+- `src/harness_lab/human_feedback.py` — allow VRAM pressure to become an
+  explicit human-facing request when the evidence supports it
 
 ---
 
