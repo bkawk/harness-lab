@@ -6,18 +6,18 @@ The GitHub repo is the lab dashboard.
 - status: `running`
 - vital_spark_at: `2026-03-31T10:12:12+00:00`
 - started_at: `2026-03-31T19:56:46+00:00`
-- last_heartbeat: `2026-03-31T20:00:55+00:00`
-- cycles_completed: `8`
+- last_heartbeat: `2026-03-31T20:01:30+00:00`
+- cycles_completed: `9`
 - genesis seed: `cand_0001`
-- last candidate: `cand_0099`
+- last candidate: `cand_0100`
 - last dataset: `abc_boundary512`
 - last commit: `-`
 - last publish message: `Publishing skipped.`
 - last cycle mode: `novelty_cycle`
-- novelty cycles triggered: `8`
+- novelty cycles triggered: `9`
 
 ## Latest Step
-- candidate: `cand_0099`
+- candidate: `cand_0100`
 - dataset: `abc_boundary512` via `reused_prepared_dataset`
 - seed action: `existing`
 - proposal status: `candidate`
@@ -37,11 +37,11 @@ The GitHub repo is the lab dashboard.
 - backend_poll_interval_seconds: `-`
 
 ## Recent Candidates
+- `cand_0100`: outcome `audit_blocked`; diagnosis `complete`; benchmark `0.357`
 - `cand_0099`: outcome `audit_blocked`; diagnosis `complete`; benchmark `0.423`
 - `cand_0098`: outcome `audit_blocked`; diagnosis `complete`; benchmark `0.417`
 - `cand_0097`: outcome `audit_blocked`; diagnosis `complete`; benchmark `0.369`
 - `cand_0096`: outcome `audit_blocked`; diagnosis `complete`; benchmark `0.342`
-- `cand_0095`: outcome `audit_blocked`; diagnosis `complete`; benchmark `0.363`
 
 ## Science Leaders
 - best benchmark: `cand_0092` -> `0.442`
@@ -50,18 +50,18 @@ The GitHub repo is the lab dashboard.
 - best stable: `cand_0009` -> audit `0.3292391423260943`
 
 ## Science Trend
-- summary: `Across the last 5 scored candidates, benchmark averaged 0.382800, audit averaged 0.353300, and the mean transfer gap was 0.029500.`
-- recent benchmark avg: `0.3828`
-- recent audit avg: `0.35330000000000006`
-- recent transfer gap avg: `0.02949999999999998`
+- summary: `Across the last 5 scored candidates, benchmark averaged 0.381600, audit averaged 0.353700, and the mean transfer gap was 0.027900.`
+- recent benchmark avg: `0.3816`
+- recent audit avg: `0.3537`
+- recent transfer gap avg: `0.02789999999999998`
+- `cand_0100`: benchmark `0.357`, audit `0.3265`, gap `0.03049999999999997`
 - `cand_0099`: benchmark `0.423`, audit `0.3975`, gap `0.025499999999999967`
 - `cand_0098`: benchmark `0.417`, audit `0.3895`, gap `0.02749999999999997`
 - `cand_0097`: benchmark `0.369`, audit `0.3425`, gap `0.026499999999999968`
 - `cand_0096`: benchmark `0.342`, audit `0.3125`, gap `0.029500000000000026`
-- `cand_0095`: benchmark `0.363`, audit `0.3245`, gap `0.03849999999999998`
 
 ## Hindsight
-- summary: `The lab saw 22 audit-blocked outcomes; it should have emphasized transfer-stability checks earlier.`
+- summary: `The lab saw 23 audit-blocked outcomes; it should have emphasized transfer-stability checks earlier.`
 - adjustment: `Raise priority for proposals that directly target transfer stability after an audit_blocked result.`
 
 ## Policy
