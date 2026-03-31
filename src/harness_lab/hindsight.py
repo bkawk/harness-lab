@@ -81,14 +81,62 @@ def _mechanism_stats(index: dict) -> list[MechanismStats]:
     return results
 
 
+def _backend_fingerprint_stats(index: dict) -> list[dict]:
+    buckets: dict[str, dict] = defaultdict(
+        lambda: {
+            "attempts": 0,
+            "positive_count": 0,
+            "negative_count": 0,
+            "audit_scores": [],
+            "outcomes": Counter(),
+        }
+    )
+    for candidate in index.get("candidates", []):
+        fingerprints = [str(item).strip() for item in candidate.get("backend_fingerprints", []) if str(item).strip()]
+        if not fingerprints:
+            continue
+        outcome_label = str(candidate.get("outcome_label", "")).strip()
+        audit_score = candidate.get("audit_score")
+        for fingerprint in fingerprints:
+            bucket = buckets[fingerprint]
+            bucket["attempts"] += 1
+            if outcome_label:
+                bucket["outcomes"][outcome_label] += 1
+            if outcome_label in POSITIVE_OUTCOMES:
+                bucket["positive_count"] += 1
+            if outcome_label in NEGATIVE_OUTCOMES:
+                bucket["negative_count"] += 1
+            if isinstance(audit_score, (int, float)):
+                bucket["audit_scores"].append(float(audit_score))
+
+    results: list[dict] = []
+    for fingerprint, bucket in buckets.items():
+        audit_scores = list(bucket["audit_scores"])
+        results.append(
+            {
+                "fingerprint": fingerprint,
+                "attempts": int(bucket["attempts"]),
+                "positive_count": int(bucket["positive_count"]),
+                "negative_count": int(bucket["negative_count"]),
+                "avg_audit_score": (sum(audit_scores) / len(audit_scores)) if audit_scores else None,
+                "outcome_counts": dict(sorted(bucket["outcomes"].items())),
+            }
+        )
+    results.sort(key=lambda item: (-item["attempts"], item["fingerprint"]))
+    return results
+
+
 def build_hindsight(candidates_dir: Path) -> dict:
     index = build_candidate_index(candidates_dir)
     outcome_counts = Counter(index.get("outcome_label_counts", {}))
     failure_counts = Counter(index.get("observed_failure_mode_counts", {}))
     mechanism_stats = _mechanism_stats(index)
+    backend_fingerprint_stats = _backend_fingerprint_stats(index)
 
     over_explored: list[dict] = []
     under_explored_promising: list[dict] = []
+    over_explored_backend_fingerprints: list[dict] = []
+    under_explored_backend_fingerprints: list[dict] = []
     for stat in mechanism_stats:
         if stat.attempts >= 3 and stat.positive_count == 0 and stat.negative_count >= 2:
             over_explored.append(
@@ -113,6 +161,32 @@ def build_hindsight(candidates_dir: Path) -> dict:
             -item["positive_count"],
             -(item["avg_benchmark_score"] if item["avg_benchmark_score"] is not None else -1.0),
             item["mechanism"],
+        )
+    )
+
+    for stat in backend_fingerprint_stats:
+        if stat["attempts"] >= 3 and stat["positive_count"] == 0 and stat["negative_count"] >= 2:
+            over_explored_backend_fingerprints.append(
+                {
+                    **stat,
+                    "why": "This backend change type has been tried repeatedly without a positive outcome.",
+                }
+            )
+        if stat["attempts"] <= 2 and (
+            stat["positive_count"] > 0 or (stat["avg_audit_score"] is not None and stat["avg_audit_score"] >= 0.28)
+        ):
+            under_explored_backend_fingerprints.append(
+                {
+                    **stat,
+                    "why": "This backend change type has limited attempts and comparatively better audit evidence.",
+                }
+            )
+    over_explored_backend_fingerprints.sort(key=lambda item: (-item["attempts"], item["fingerprint"]))
+    under_explored_backend_fingerprints.sort(
+        key=lambda item: (
+            -item["positive_count"],
+            -(item["avg_audit_score"] if item["avg_audit_score"] is not None else -1.0),
+            item["fingerprint"],
         )
     )
 
@@ -148,6 +222,20 @@ def build_hindsight(candidates_dir: Path) -> dict:
             f"The mechanism `{under_explored_promising[0]['mechanism']}` looks under-explored and should have been revisited sooner."
         )
         policy_adjustments.append(f"Bias the next parent/proposal choice toward `{under_explored_promising[0]['mechanism']}`.")
+    if over_explored_backend_fingerprints:
+        hindsight_findings.append(
+            f"The backend change type `{over_explored_backend_fingerprints[0]['fingerprint']}` appears over-used relative to its outcomes."
+        )
+        policy_adjustments.append(
+            f"Cool down backend edits tagged `{over_explored_backend_fingerprints[0]['fingerprint']}` until a different scientific line shows evidence."
+        )
+    if under_explored_backend_fingerprints:
+        hindsight_findings.append(
+            f"The backend change type `{under_explored_backend_fingerprints[0]['fingerprint']}` looks promising and under-explored."
+        )
+        policy_adjustments.append(
+            f"Raise priority for backend edits tagged `{under_explored_backend_fingerprints[0]['fingerprint']}`."
+        )
 
     summary = (
         hindsight_findings[0]
@@ -164,7 +252,10 @@ def build_hindsight(candidates_dir: Path) -> dict:
         "top_failure_modes": _top_items(failure_counts, limit=5, minimum=1),
         "over_explored_mechanisms": over_explored[:5],
         "under_explored_promising_mechanisms": under_explored_promising[:5],
+        "over_explored_backend_fingerprints": over_explored_backend_fingerprints[:5],
+        "under_explored_backend_fingerprints": under_explored_backend_fingerprints[:5],
         "mechanism_stats": [item.to_dict() for item in mechanism_stats],
+        "backend_fingerprint_stats": backend_fingerprint_stats,
     }
 
 
@@ -186,7 +277,10 @@ def read_hindsight(memory_dir: Path) -> dict:
             "top_failure_modes": [],
             "over_explored_mechanisms": [],
             "under_explored_promising_mechanisms": [],
+            "over_explored_backend_fingerprints": [],
+            "under_explored_backend_fingerprints": [],
             "mechanism_stats": [],
+            "backend_fingerprint_stats": [],
         }
     import json
 
