@@ -6,18 +6,18 @@ The GitHub repo is the lab dashboard.
 - status: `running`
 - vital_spark_at: `2026-03-31T10:12:12+00:00`
 - started_at: `2026-03-31T19:04:45+00:00`
-- last_heartbeat: `2026-03-31T19:14:48+00:00`
-- cycles_completed: `1`
+- last_heartbeat: `2026-03-31T19:25:23+00:00`
+- cycles_completed: `2`
 - genesis seed: `cand_0001`
-- last candidate: `cand_0087`
+- last candidate: `cand_0088`
 - last dataset: `abc_boundary512`
 - last commit: `-`
 - last publish message: `Publishing skipped.`
 - last cycle mode: `novelty_cycle`
-- novelty cycles triggered: `1`
+- novelty cycles triggered: `2`
 
 ## Latest Step
-- candidate: `cand_0087`
+- candidate: `cand_0088`
 - dataset: `abc_boundary512` via `reused_prepared_dataset`
 - seed action: `existing`
 - proposal status: `candidate`
@@ -37,11 +37,11 @@ The GitHub repo is the lab dashboard.
 - backend_poll_interval_seconds: `-`
 
 ## Recent Candidates
+- `cand_0088`: outcome `audit_blocked`; diagnosis `complete`; benchmark `0.30547888991484906`
 - `cand_0087`: outcome `audit_blocked`; diagnosis `complete`; benchmark `0.3322942028070658`
 - `cand_0086`: outcome `-`; diagnosis `empty`; benchmark `None`
 - `cand_0085`: outcome `audit_blocked`; diagnosis `complete`; benchmark `0.32620864478060324`
 - `cand_0084`: outcome `audit_blocked`; diagnosis `complete`; benchmark `0.3185653946291464`
-- `cand_0083`: outcome `-`; diagnosis `empty`; benchmark `None`
 
 ## Science Leaders
 - best benchmark: `cand_0079` -> `0.3904422083225122`
@@ -50,16 +50,17 @@ The GitHub repo is the lab dashboard.
 - best stable: `cand_0009` -> audit `0.3292391423260943`
 
 ## Science Trend
-- summary: `Across the last 3 scored candidates, benchmark averaged 0.325689, audit averaged 0.258043, and the mean transfer gap was 0.067646.`
-- recent benchmark avg: `0.3256894140722718`
-- recent audit avg: `0.2580431472703996`
-- recent transfer gap avg: `0.06764626680187223`
+- summary: `Across the last 4 scored candidates, benchmark averaged 0.320637, audit averaged 0.247752, and the mean transfer gap was 0.072885.`
+- recent benchmark avg: `0.3206367830329161`
+- recent audit avg: `0.2477522299264211`
+- recent transfer gap avg: `0.07288455310649503`
+- `cand_0088`: benchmark `0.30547888991484906`, audit `0.2168794778944856`, gap `0.08859941202036345`
 - `cand_0087`: benchmark `0.3322942028070658`, audit `0.2603944590368681`, gap `0.0718997437701977`
 - `cand_0085`: benchmark `0.32620864478060324`, audit `0.24851853042575162`, gap `0.07769011435485162`
 - `cand_0084`: benchmark `0.3185653946291464`, audit `0.26521645234857905`, gap `0.05334894228056736`
 
 ## Hindsight
-- summary: `The lab saw 11 audit-blocked outcomes; it should have emphasized transfer-stability checks earlier.`
+- summary: `The lab saw 12 audit-blocked outcomes; it should have emphasized transfer-stability checks earlier.`
 - adjustment: `Raise priority for proposals that directly target transfer stability after an audit_blocked result.`
 
 ## Policy
@@ -82,19 +83,16 @@ The GitHub repo is the lab dashboard.
 - command_backend_configured: `True`
 
 ## External Review
-- status: `idle`
-- trigger_reason: `-`
-- reviewer: `heuristic`
-- summary: `After 84 candidates, the lab requested peer review because `repeated_audit_blocked` fired. Current policy mode is `stabilize`.`
-- lab advice: `Bias the next branch toward under-explored backend fingerprints or mechanisms instead of repeating the current local basin.`
-- human advice: `Consider strengthening the non-self-evolving seed around `startup_timeout` if that failure mode keeps dominating.`
-- human advice: `Consider exposing `initial_harness` as a more explicit evolvable backend module if it keeps dominating search.`
+- status: `cooldown`
+- trigger_reason: `repeated_audit_blocked`
+- reviewer: `none`
+- summary: `No external review yet.`
+- lab advice: `No live external advice.`
+- human advice: `No human-facing advice.`
 
 ## What The Lab Wants
-- summary: `The lab has 5 ranked requests for human help.`
+- summary: `The lab has 3 ranked requests for human help.`
 - [12] `evaluation`: `Improve transfer-stability evaluation or smoke tests so promising candidates fail earlier before full audit.`
-- [10] `module_surface`: `Consider exposing `initial_harness` as a more explicit evolvable backend module if it keeps dominating search.`
-- [10] `non_self_evolving`: `Consider strengthening the non-self-evolving seed around `startup_timeout` if that failure mode keeps dominating.`
 - [9] `ops`: `Harden backend startup and completion reporting so stalled candidates stop consuming full budget.`
 - [7] `dataset`: `Consider improving the validation split or transfer-oriented data slices so the lab can distinguish local wins from robust gains sooner.`
 
