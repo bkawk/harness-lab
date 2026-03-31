@@ -6,18 +6,18 @@ The GitHub repo is the lab dashboard.
 - status: `running`
 - vital_spark_at: `2026-03-31T10:12:12+00:00`
 - started_at: `2026-03-31T16:43:51+00:00`
-- last_heartbeat: `2026-03-31T17:04:25+00:00`
-- cycles_completed: `2`
+- last_heartbeat: `2026-03-31T17:14:59+00:00`
+- cycles_completed: `3`
 - genesis seed: `cand_0001`
-- last candidate: `cand_0073`
+- last candidate: `cand_0074`
 - last dataset: `abc_boundary512`
 - last commit: `-`
 - last publish message: `Publishing skipped.`
 - last cycle mode: `novelty_cycle`
-- novelty cycles triggered: `2`
+- novelty cycles triggered: `3`
 
 ## Latest Step
-- candidate: `cand_0073`
+- candidate: `cand_0074`
 - dataset: `abc_boundary512` via `reused_prepared_dataset`
 - seed action: `existing`
 - proposal status: `candidate`
@@ -37,11 +37,11 @@ The GitHub repo is the lab dashboard.
 - backend_poll_interval_seconds: `-`
 
 ## Recent Candidates
+- `cand_0074`: outcome `stalled`; diagnosis `complete`; benchmark `None`
 - `cand_0073`: outcome `stalled`; diagnosis `complete`; benchmark `None`
 - `cand_0072`: outcome `stalled`; diagnosis `complete`; benchmark `None`
 - `cand_0071`: outcome `-`; diagnosis `empty`; benchmark `None`
 - `cand_0070`: outcome `-`; diagnosis `empty`; benchmark `None`
-- `cand_0069`: outcome `-`; diagnosis `empty`; benchmark `None`
 
 ## Science Leaders
 - best benchmark: `cand_0013` -> `0.3847249926656351`
