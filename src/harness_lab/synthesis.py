@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -7,6 +9,7 @@ from harness_lab.budget import read_budget, write_budget
 from harness_lab.diversity import write_diversity
 from harness_lab.hardware import read_hardware_profile
 from harness_lab.hindsight import read_hindsight, write_hindsight
+from harness_lab.llm import run_claude_json
 from harness_lab.memory import build_candidate_index, write_candidate_index, write_science_summary
 from harness_lab.policy import read_policy, write_policy
 from harness_lab.workspace import write_json
@@ -32,6 +35,124 @@ class ParentCandidateScore:
             "total_score": self.total_score,
             "reasons": list(self.reasons),
         }
+
+
+def _llm_parent_prompt(index: dict, ranked: list[ParentCandidateScore], hindsight: dict, policy: dict, budget: dict, hardware_profile: dict) -> str:
+    summary_map = {
+        str(item.get("candidate_id", "")): item
+        for item in index.get("candidates", [])
+        if str(item.get("candidate_id", "")).strip()
+    }
+    compact_ranked = []
+    for item in ranked[:8]:
+        summary = summary_map.get(item.candidate_id, {})
+        compact_ranked.append(
+            {
+                "candidate_id": item.candidate_id,
+                "heuristic_score": item.total_score,
+                "heuristic_reasons": list(item.reasons),
+                "outcome_label": summary.get("outcome_label", ""),
+                "diagnosis_mechanism": summary.get("diagnosis_mechanism", ""),
+                "failure_modes": summary.get("failure_modes", []),
+                "backend_fingerprints": summary.get("backend_fingerprints", []),
+                "benchmark_score": summary.get("benchmark_score"),
+                "audit_score": summary.get("audit_score"),
+            }
+        )
+    payload = {
+        "candidate_count": index.get("candidate_count", 0),
+        "ranked_candidates": compact_ranked,
+        "hindsight_summary": hindsight.get("summary", ""),
+        "policy_summary": policy.get("summary", ""),
+        "budget_summary": budget.get("summary", ""),
+        "hardware_summary": {
+            "environment_hint": hardware_profile.get("environment_hint", ""),
+            "cpu_count": hardware_profile.get("cpu_count"),
+            "memory_gb_estimate": hardware_profile.get("memory_gb_estimate"),
+        },
+    }
+    return (
+        "You are choosing the next parent candidate for harness-lab.\n"
+        "Return only JSON with keys: top_parent_id, reasoning, candidate_adjustments.\n"
+        "top_parent_id must be one of the provided candidate ids.\n"
+        "candidate_adjustments must be an array of objects with keys: candidate_id, score_delta, reason.\n"
+        "Keep the result grounded in the supplied candidate evidence.\n\n"
+        f"{json.dumps(payload, indent=2, sort_keys=True)}"
+    )
+
+
+def _apply_llm_parent_selection(
+    index: dict,
+    ranked: list[ParentCandidateScore],
+    hindsight: dict,
+    policy: dict,
+    budget: dict,
+    hardware_profile: dict,
+    *,
+    cwd: Path,
+) -> tuple[list[ParentCandidateScore], dict]:
+    if str(os.environ.get("HARNESS_LAB_LLM_PARENT_SELECTION_ENABLED", "")).strip().lower() not in {"1", "true", "yes"}:
+        return ranked, {}
+    if not ranked:
+        return ranked, {}
+    payload = run_claude_json(
+        _llm_parent_prompt(index, ranked, hindsight, policy, budget, hardware_profile),
+        cwd=cwd,
+    )
+    if not isinstance(payload, dict):
+        return ranked, {}
+    top_parent_id = str(payload.get("top_parent_id", "")).strip()
+    valid_ids = {item.candidate_id for item in ranked}
+    if top_parent_id not in valid_ids:
+        return ranked, {}
+
+    adjustments: dict[str, tuple[int, str]] = {}
+    for item in payload.get("candidate_adjustments", []):
+        if not isinstance(item, dict):
+            continue
+        candidate_id = str(item.get("candidate_id", "")).strip()
+        if candidate_id not in valid_ids:
+            continue
+        try:
+            score_delta = int(item.get("score_delta", 0) or 0)
+        except (TypeError, ValueError):
+            score_delta = 0
+        reason = str(item.get("reason", "")).strip()
+        adjustments[candidate_id] = (score_delta, reason)
+
+    revised: list[ParentCandidateScore] = []
+    for item in ranked:
+        delta, reason = adjustments.get(item.candidate_id, (0, ""))
+        reasons = list(item.reasons)
+        total = item.total_score + delta
+        if delta:
+            reasons.append(f"llm_parent_delta={delta}")
+        if reason:
+            reasons.append(f"llm_parent_reason:{reason}")
+        if item.candidate_id == top_parent_id:
+            total += 1000
+            reasons.append("llm_parent_selected=1000")
+        revised.append(
+            ParentCandidateScore(
+                candidate_id=item.candidate_id,
+                total_score=total,
+                reasons=tuple(reasons),
+            )
+        )
+    revised.sort(key=lambda item: (-item.total_score, item.candidate_id))
+    return revised, {
+        "reviewer": "claude",
+        "top_parent_id": top_parent_id,
+        "reasoning": str(payload.get("reasoning", "")).strip(),
+        "candidate_adjustments": [
+            {
+                "candidate_id": candidate_id,
+                "score_delta": delta,
+                "reason": reason,
+            }
+            for candidate_id, (delta, reason) in adjustments.items()
+        ],
+    }
 
 
 def score_parent_candidate(summary: dict) -> ParentCandidateScore:
@@ -223,6 +344,15 @@ def synthesize_parent_candidates(candidates_dir: Path, output_path: Path | None 
         for summary in index["candidates"]
     ]
     ranked.sort(key=lambda item: (-item.total_score, item.candidate_id))
+    ranked, llm_parent_selection = _apply_llm_parent_selection(
+        index,
+        ranked,
+        hindsight,
+        policy,
+        budget,
+        hardware_profile,
+        cwd=candidates_dir.parent.parent,
+    )
     viable = [item for item in ranked if item.total_score >= 0]
 
     payload = {
@@ -237,6 +367,7 @@ def synthesize_parent_candidates(candidates_dir: Path, output_path: Path | None 
         "failure_mode_counts": index["failure_mode_counts"],
         "diagnosis_mechanism_counts": index["diagnosis_mechanism_counts"],
         "diagnosis_severity_counts": index["diagnosis_severity_counts"],
+        "llm_parent_selection": llm_parent_selection,
     }
     if output_path is not None:
         output_path.parent.mkdir(parents=True, exist_ok=True)

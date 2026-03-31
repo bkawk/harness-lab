@@ -49,6 +49,7 @@ fallback validators.
 Current status:
 - bounded external review via `claude -p` is implemented with heuristic fallback
 - proposal authoring now has the same shape: optional Claude-authored `rationale`, `target`, and `changes`, with the existing heuristic draft preserved as fallback
+- parent selection now has the same shape: optional Claude-ranked top-parent choice with heuristic scoring preserved as fallback
 
 ### What the LLM does
 
