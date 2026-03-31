@@ -12,8 +12,10 @@ This repo is meant to feel alive:
 - the lab can draft follow-ups from prior evidence
 - every candidate can begin with a bootstrap snapshot of the current scientific situation
 - every candidate can carry a richer decision bundle that separates scored, pending, and stalled lines before Claude makes bounded choices
+- every cycle can produce a review-only mutation brief that either recommends a tightly scoped backend change or waiting for more post-change evidence
 - the lab can notice the machine it is running on and adapt its assumptions
 - the lab can look back over its own evolutions and write explicit hindsight
+- the lab can distinguish long-term pressure from the recent scored frontier when it writes hindsight
 - the lab can let hindsight change what it tries next
 - the lab can decide when it needs bounded outside perspective and split that into `lab_advice` and `human_advice`
 - the lab can derive an explicit policy state from hindsight and hardware
@@ -76,16 +78,30 @@ Right now `harness-lab` can:
 - optionally let Claude author execution plans from proposal and diagnosis while preserving the current planner as fallback
 - optionally let Claude write hindsight and synthesize policy while preserving the current heuristic builders as fallback
 - the lab can now rank its human-facing requests and surface them as “What The Lab Wants”
+- the lab can track which human requests were addressed and surface them as “What We Did”
+- the lab can generate `artifacts/memory/mutation_brief.json` and `docs/next_change.md` as review-only change briefs
+- the lab can gate those mutation briefs on a minimum number of scored post-change candidates so it does not mutate too eagerly
 - enforce follow-up budgets so exhausted mechanisms stop dominating the search
 - let budget force a broader branch when the current line has had enough chances
 - let short-term diversity trigger novelty steps before the search feels stale
 - detect and record the hardware it is running on
 - carry hardware context into planning and execution
 - use hardware context to influence parent ranking and proposal shape
+- write explicit GPU/VRAM pressure and VRAM-headroom signals into science-debug and human-feedback memory
 - register and import datasets with provenance instead of depending on sibling repos
 - bootstrap ABC-backed dataset sources directly into the repo
 - build prepared local ABC datasets inside the repo
+- preserve named evaluation slices for benchmark, smoke, and audit-style checks
+- run multi-slice transfer smoke checks before full audit
 - consult the dataset registry before execution
+- split the repo-native science backend into explicit modules:
+  - `science_model`
+  - `science_loss`
+  - `science_eval`
+  - `science_config`
+  - `science_train`
+- track backend module touch history so Claude and hindsight can reason about module-level outcomes instead of one opaque backend blob
+- write science progress and science-debug summaries so long-running candidates and silent backend failures are diagnosable
 - push tracked source/docs evolution to GitHub in a controlled way
 - run a long-lived `big-bang` supervisor that seeds, evolves, and republishes the lab state
 - surface live backend polling state in the repo dashboard while science is still running
@@ -115,6 +131,8 @@ Right now `harness-lab` can:
 - `docs/diversity.md`
 - `docs/external_review.md`
 - `docs/bootstrap_snapshot.md`
+- `docs/initial_harness_modularization.md`
+- `docs/next_change.md` (generated)
 
 ## Quick Start
 
@@ -146,6 +164,15 @@ Build the current bounded external review artifact with:
 
 ```bash
 PYTHONPATH=src python3 scripts/build_external_review.py
+```
+
+Inspect the current review-only memory layer under:
+
+```text
+artifacts/memory/hindsight.json
+artifacts/memory/human_feedback.json
+artifacts/memory/mutation_brief.json
+docs/next_change.md
 ```
 
 Build the current diversity artifact with:
