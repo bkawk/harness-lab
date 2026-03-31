@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 from harness_lab.backend import read_backend_profile, write_backend_profile
@@ -8,6 +9,7 @@ from harness_lab.diversity import read_diversity
 from harness_lab.external_review import read_external_review
 from harness_lab.hardware import read_hardware_profile
 from harness_lab.hindsight import read_hindsight
+from harness_lab.llm import run_claude_json
 from harness_lab.memory import read_json, write_candidate_index
 from harness_lab.workspace import write_json
 
@@ -26,6 +28,66 @@ def default_policy() -> dict:
         "policy_adjustments": [],
         "evidence": [],
     }
+
+
+def _llm_policy_prompt(index: dict, hindsight: dict, diversity: dict, hardware: dict, backend: dict, external_review: dict, fallback_policy: dict) -> str:
+    payload = {
+        "candidate_count": index.get("candidate_count", 0),
+        "hindsight_summary": hindsight.get("summary", ""),
+        "hindsight_findings": hindsight.get("hindsight_findings", [])[:8],
+        "policy_adjustments": hindsight.get("policy_adjustments", [])[:8],
+        "diversity_summary": diversity.get("summary", ""),
+        "hardware_summary": {
+            "environment_hint": hardware.get("environment_hint", ""),
+            "cpu_count": hardware.get("cpu_count"),
+            "memory_gb_estimate": hardware.get("memory_gb_estimate"),
+        },
+        "backend_summary": backend.get("summary", ""),
+        "external_review_summary": {
+            "status": external_review.get("status", ""),
+            "trigger_reason": external_review.get("trigger_reason", ""),
+            "reviewer": external_review.get("reviewer", ""),
+            "lab_advice": external_review.get("lab_advice", [])[:3],
+        },
+        "heuristic_fallback_policy": fallback_policy,
+    }
+    return (
+        "You are synthesizing bounded policy for harness-lab.\n"
+        "Return only JSON with keys: summary, selection_mode, cooldown_multiplier, underexplored_bonus, "
+        "backend_fingerprint_bonus, backend_fingerprint_cooldown, preferred_runner_backend, publish_every_cycles, "
+        "novelty_cycle_priority, policy_adjustments, evidence.\n"
+        "Keep the policy grounded in the supplied hindsight and operating context.\n\n"
+        f"{json.dumps(payload, indent=2, sort_keys=True)}"
+    )
+
+
+def _normalize_llm_policy_payload(payload: dict, fallback: dict) -> dict | None:
+    if not isinstance(payload, dict):
+        return None
+    summary = str(payload.get("summary", "")).strip()
+    selection_mode = str(payload.get("selection_mode", fallback.get("selection_mode", "balanced"))).strip()
+    preferred_runner_backend = str(payload.get("preferred_runner_backend", fallback.get("preferred_runner_backend", "simulated"))).strip()
+    novelty_cycle_priority = str(payload.get("novelty_cycle_priority", fallback.get("novelty_cycle_priority", "normal"))).strip()
+    if not summary:
+        return None
+    normalized = dict(fallback)
+    normalized.update(
+        {
+            "summary": summary,
+            "selection_mode": selection_mode or fallback.get("selection_mode", "balanced"),
+            "cooldown_multiplier": float(payload.get("cooldown_multiplier", fallback.get("cooldown_multiplier", 1.0)) or fallback.get("cooldown_multiplier", 1.0)),
+            "underexplored_bonus": int(payload.get("underexplored_bonus", fallback.get("underexplored_bonus", 20)) or fallback.get("underexplored_bonus", 20)),
+            "backend_fingerprint_bonus": int(payload.get("backend_fingerprint_bonus", fallback.get("backend_fingerprint_bonus", 10)) or fallback.get("backend_fingerprint_bonus", 10)),
+            "backend_fingerprint_cooldown": int(payload.get("backend_fingerprint_cooldown", fallback.get("backend_fingerprint_cooldown", 12)) or fallback.get("backend_fingerprint_cooldown", 12)),
+            "preferred_runner_backend": preferred_runner_backend or fallback.get("preferred_runner_backend", "simulated"),
+            "publish_every_cycles": int(payload.get("publish_every_cycles", fallback.get("publish_every_cycles", 1)) or fallback.get("publish_every_cycles", 1)),
+            "novelty_cycle_priority": novelty_cycle_priority or fallback.get("novelty_cycle_priority", "normal"),
+            "policy_adjustments": [str(item).strip() for item in payload.get("policy_adjustments", []) if str(item).strip()][:8] or list(fallback.get("policy_adjustments", [])),
+            "evidence": [str(item).strip() for item in payload.get("evidence", []) if str(item).strip()][:8] or list(fallback.get("evidence", [])),
+            "policy_reviewer": "claude",
+        }
+    )
+    return normalized
 
 
 def build_policy(candidates_dir: Path, memory_dir: Path) -> dict:
@@ -129,7 +191,7 @@ def build_policy(candidates_dir: Path, memory_dir: Path) -> dict:
         summary = str(external_review.get("situation_summary", summary)) or summary
         evidence.append("policy:external_review_active")
 
-    return {
+    payload = {
         "summary": summary,
         "selection_mode": selection_mode,
         "cooldown_multiplier": cooldown_multiplier,
@@ -152,6 +214,15 @@ def build_policy(candidates_dir: Path, memory_dir: Path) -> dict:
         "hindsight_summary": hindsight.get("summary", ""),
         "diversity_summary": diversity.get("summary", ""),
     }
+    if str(os.environ.get("HARNESS_LAB_LLM_POLICY_ENABLED", "")).strip().lower() in {"1", "true", "yes"}:
+        llm_payload = run_claude_json(
+            _llm_policy_prompt(index, hindsight, diversity, hardware, backend, external_review, payload),
+            cwd=candidates_dir.parent.parent,
+        )
+        normalized = _normalize_llm_policy_payload(llm_payload or {}, payload)
+        if normalized:
+            return normalized
+    return payload
 
 
 def write_policy(candidates_dir: Path, memory_dir: Path, output_path: Path | None = None) -> Path:

@@ -52,6 +52,7 @@ Current status:
 - parent selection now has the same shape: optional Claude-ranked top-parent choice with heuristic scoring preserved as fallback
 - diagnosis reconciliation now has the same shape: optional Claude-authored causal diagnosis with the existing rule-based reconciliation preserved as fallback
 - execution planning now has the same shape: optional Claude-authored benchmark/audit plan with the existing planner preserved as fallback
+- hindsight and policy now have the same shape: optional Claude-authored synthesis with the current heuristic builders preserved as fallback
 
 ### What the LLM does
 

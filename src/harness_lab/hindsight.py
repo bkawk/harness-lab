@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import json
+import os
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 
+from harness_lab.llm import run_claude_json
 from harness_lab.memory import build_candidate_index
 from harness_lab.workspace import write_json
 
@@ -125,6 +127,59 @@ def _backend_fingerprint_stats(index: dict) -> list[dict]:
         )
     results.sort(key=lambda item: (-item["attempts"], item["fingerprint"]))
     return results
+
+
+def _llm_hindsight_prompt(index: dict, heuristic_payload: dict) -> str:
+    recent_candidates = list(index.get("candidates", []))[-8:]
+    compact_recent = [
+        {
+            "candidate_id": item.get("candidate_id", ""),
+            "outcome_label": item.get("outcome_label", ""),
+            "diagnosis_mechanism": item.get("diagnosis_mechanism", ""),
+            "backend_fingerprints": item.get("backend_fingerprints", []),
+            "benchmark_score": item.get("benchmark_score"),
+            "audit_score": item.get("audit_score"),
+        }
+        for item in recent_candidates
+    ]
+    payload = {
+        "candidate_count": heuristic_payload.get("candidate_count", 0),
+        "top_outcomes": heuristic_payload.get("top_outcomes", []),
+        "top_failure_modes": heuristic_payload.get("top_failure_modes", []),
+        "over_explored_mechanisms": heuristic_payload.get("over_explored_mechanisms", []),
+        "under_explored_promising_mechanisms": heuristic_payload.get("under_explored_promising_mechanisms", []),
+        "over_explored_backend_fingerprints": heuristic_payload.get("over_explored_backend_fingerprints", []),
+        "under_explored_backend_fingerprints": heuristic_payload.get("under_explored_backend_fingerprints", []),
+        "throughput_summary": heuristic_payload.get("throughput_summary", {}),
+        "process_classification_counts": heuristic_payload.get("process_classification_counts", {}),
+        "recent_candidates": compact_recent,
+        "heuristic_summary": heuristic_payload.get("summary", ""),
+        "heuristic_findings": heuristic_payload.get("hindsight_findings", []),
+        "heuristic_policy_adjustments": heuristic_payload.get("policy_adjustments", []),
+    }
+    return (
+        "You are writing bounded hindsight for harness-lab.\n"
+        "Return only JSON with keys: summary, hindsight_findings, policy_adjustments.\n"
+        "hindsight_findings and policy_adjustments must be arrays of short strings.\n"
+        "Keep the output grounded in the supplied evidence and preserve the lab's bounded, actionable style.\n\n"
+        f"{json.dumps(payload, indent=2, sort_keys=True)}"
+    )
+
+
+def _normalize_llm_hindsight_payload(payload: dict, fallback: dict) -> dict | None:
+    if not isinstance(payload, dict):
+        return None
+    summary = str(payload.get("summary", "")).strip()
+    findings = [str(item).strip() for item in payload.get("hindsight_findings", []) if str(item).strip()]
+    adjustments = [str(item).strip() for item in payload.get("policy_adjustments", []) if str(item).strip()]
+    if not summary:
+        return None
+    normalized = dict(fallback)
+    normalized["summary"] = summary
+    normalized["hindsight_findings"] = findings[:8] if findings else list(fallback.get("hindsight_findings", []))
+    normalized["policy_adjustments"] = adjustments[:8] if adjustments else list(fallback.get("policy_adjustments", []))
+    normalized["hindsight_reviewer"] = "claude"
+    return normalized
 
 
 def build_hindsight(candidates_dir: Path) -> dict:
@@ -285,7 +340,7 @@ def build_hindsight(candidates_dir: Path) -> dict:
         else "The lab has not yet accumulated enough varied evidence to produce a strong hindsight judgment."
     )
 
-    return {
+    payload = {
         "candidate_count": index.get("candidate_count", 0),
         "summary": summary,
         "hindsight_findings": hindsight_findings,
@@ -301,6 +356,12 @@ def build_hindsight(candidates_dir: Path) -> dict:
         "process_classification_counts": dict(sorted(process_classification_counts.items())),
         "throughput_summary": throughput_summary,
     }
+    if str(os.environ.get("HARNESS_LAB_LLM_HINDSIGHT_ENABLED", "")).strip().lower() in {"1", "true", "yes"}:
+        llm_payload = run_claude_json(_llm_hindsight_prompt(index, payload), cwd=candidates_dir.parent.parent)
+        normalized = _normalize_llm_hindsight_payload(llm_payload or {}, payload)
+        if normalized:
+            return normalized
+    return payload
 
 
 def write_hindsight(candidates_dir: Path, output_path: Path) -> Path:

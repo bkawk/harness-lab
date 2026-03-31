@@ -72,6 +72,7 @@ Right now `harness-lab` can:
 - optionally let Claude choose the next parent candidate from ranked memory while preserving the heuristic scorer as fallback
 - optionally let Claude reconcile outcome and trace evidence into diagnosis while preserving rule-based diagnosis as fallback
 - optionally let Claude author execution plans from proposal and diagnosis while preserving the current planner as fallback
+- optionally let Claude write hindsight and synthesize policy while preserving the current heuristic builders as fallback
 - enforce follow-up budgets so exhausted mechanisms stop dominating the search
 - let budget force a broader branch when the current line has had enough chances
 - let short-term diversity trigger novelty steps before the search feels stale
