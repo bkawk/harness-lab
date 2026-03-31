@@ -53,7 +53,10 @@ def _load_workspace(candidates_dir: Path, candidate_id: str) -> dict:
 
 
 def _load_existing_proposal(candidates_dir: Path, candidate_id: str) -> dict:
-    return read_json(_candidate_root(candidates_dir, candidate_id) / "proposal.json")
+    path = _candidate_root(candidates_dir, candidate_id) / "proposal.json"
+    if not path.exists():
+        return {}
+    return read_json(path)
 
 
 def choose_dataset_id(candidates_dir: Path) -> str:

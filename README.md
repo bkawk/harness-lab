@@ -107,6 +107,7 @@ Right now `harness-lab` can:
 - `docs/backend_science_plan.md`
 - `docs/external_review.md`
 - `docs/bootstrap_snapshot.md`
+- `docs/meta_harness_import_log.md`
 
 ## Quick Start
 

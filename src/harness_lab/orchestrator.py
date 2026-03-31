@@ -16,7 +16,11 @@ def next_candidate_id(candidates_dir: Path) -> str:
     candidates_dir.mkdir(parents=True, exist_ok=True)
     max_index = 0
     for path in candidates_dir.iterdir():
-        if not path.is_dir() or not (path / "workspace.json").exists():
+        if (
+            not path.is_dir()
+            or not (path / "workspace.json").exists()
+            or not (path / "proposal.json").exists()
+        ):
             continue
         name = path.name
         if not name.startswith("cand_"):
