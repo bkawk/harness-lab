@@ -4,6 +4,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from dataclasses import asdict
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -50,6 +51,46 @@ def _trace_paths(candidates_dir: Path, candidate_id: str) -> tuple[Path, Path, P
     return stdout_path, stderr_path, trace_path, result_path
 
 
+def _live_status_path(candidates_dir: Path, candidate_id: str) -> Path:
+    trace_dir = candidates_dir / candidate_id / "traces"
+    trace_dir.mkdir(parents=True, exist_ok=True)
+    return trace_dir / "live_command.json"
+
+
+def _write_live_status(
+    *,
+    candidates_dir: Path,
+    candidate_id: str,
+    backend: str,
+    command: list[str],
+    started_at: str,
+    status: str,
+    pid: int | None,
+    poll_interval_seconds: float,
+    last_poll_at: str,
+    finished_at: str | None = None,
+    returncode: int | None = None,
+) -> None:
+    payload = {
+        "candidate_id": candidate_id,
+        "backend": backend,
+        "command": command,
+        "started_at": started_at,
+        "status": status,
+        "pid": pid,
+        "poll_interval_seconds": poll_interval_seconds,
+        "last_poll_at": last_poll_at,
+    }
+    if finished_at is not None:
+        payload["finished_at"] = finished_at
+    if returncode is not None:
+        payload["returncode"] = returncode
+    _live_status_path(candidates_dir, candidate_id).write_text(
+        json.dumps(payload, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
 def _write_trace(
     *,
     candidates_dir: Path,
@@ -60,6 +101,8 @@ def _write_trace(
     started_at: str,
     finished_at: str,
     returncode: int,
+    duration_seconds: float,
+    poll_interval_seconds: float | None,
     stdout_path: Path,
     stderr_path: Path,
     outcome: CandidateOutcome,
@@ -73,10 +116,13 @@ def _write_trace(
         "command": command,
         "cwd": str(repo_dir),
         "returncode": returncode,
+        "duration_seconds": round(duration_seconds, 3),
         "stdout_path": str(stdout_path.relative_to(candidates_dir / candidate_id)),
         "stderr_path": str(stderr_path.relative_to(candidates_dir / candidate_id)),
         "outcome": asdict(outcome),
     }
+    if poll_interval_seconds is not None:
+        trace_payload["poll_interval_seconds"] = poll_interval_seconds
     if result_path is not None:
         trace_payload["backend_result_path"] = str(result_path.relative_to(candidates_dir / candidate_id))
     (candidates_dir / candidate_id / "traces" / "run.json").write_text(
@@ -151,6 +197,8 @@ def _run_simulated_backend(
         started_at=started_at,
         finished_at=utc_now(),
         returncode=result.returncode,
+        duration_seconds=0.0,
+        poll_interval_seconds=None,
         stdout_path=stdout_path,
         stderr_path=stderr_path,
         outcome=outcome,
@@ -218,16 +266,69 @@ def _run_command_backend(
         env["HARNESS_LAB_HOSTNAME"] = str(hardware_profile["hostname"])
 
     result = subprocess.run(
-        command,
+        ["bash", "-lc", "true"],
         cwd=repo_dir,
         capture_output=True,
         text=True,
-        env=env,
     )
-    stdout_path.write_text(result.stdout, encoding="utf-8")
-    stderr_path.write_text(result.stderr, encoding="utf-8")
-    if result.returncode != 0:
-        raise RuntimeError(f"Command runner failed for {candidate_id}: {result.stderr.strip() or result.stdout.strip()}")
+    poll_interval_seconds = float(os.environ.get("HARNESS_LAB_RUNNER_POLL_SECONDS", "1.0") or 1.0)
+    monotonic_start = time.monotonic()
+    with stdout_path.open("w", encoding="utf-8") as stdout_file, stderr_path.open("w", encoding="utf-8") as stderr_file:
+        process = subprocess.Popen(
+            command,
+            cwd=repo_dir,
+            stdout=stdout_file,
+            stderr=stderr_file,
+            text=True,
+            env=env,
+        )
+        _write_live_status(
+            candidates_dir=candidates_dir,
+            candidate_id=candidate_id,
+            backend="command",
+            command=command,
+            started_at=started_at,
+            status="running",
+            pid=process.pid,
+            poll_interval_seconds=poll_interval_seconds,
+            last_poll_at=started_at,
+        )
+        while True:
+            returncode = process.poll()
+            now = utc_now()
+            if returncode is not None:
+                _write_live_status(
+                    candidates_dir=candidates_dir,
+                    candidate_id=candidate_id,
+                    backend="command",
+                    command=command,
+                    started_at=started_at,
+                    status="finished",
+                    pid=process.pid,
+                    poll_interval_seconds=poll_interval_seconds,
+                    last_poll_at=now,
+                    finished_at=now,
+                    returncode=returncode,
+                )
+                break
+            _write_live_status(
+                candidates_dir=candidates_dir,
+                candidate_id=candidate_id,
+                backend="command",
+                command=command,
+                started_at=started_at,
+                status="running",
+                pid=process.pid,
+                poll_interval_seconds=poll_interval_seconds,
+                last_poll_at=now,
+            )
+            time.sleep(max(0.1, poll_interval_seconds))
+
+    duration_seconds = time.monotonic() - monotonic_start
+    stdout_text = stdout_path.read_text(encoding="utf-8")
+    stderr_text = stderr_path.read_text(encoding="utf-8")
+    if returncode != 0:
+        raise RuntimeError(f"Command runner failed for {candidate_id}: {stderr_text.strip() or stdout_text.strip()}")
 
     payload = _parse_command_backend_result(result_path)
     evidence = [str(item) for item in payload.get("evidence", []) if str(item).strip()]
@@ -263,7 +364,9 @@ def _run_command_backend(
         command=command,
         started_at=started_at,
         finished_at=utc_now(),
-        returncode=result.returncode,
+        returncode=returncode,
+        duration_seconds=duration_seconds,
+        poll_interval_seconds=poll_interval_seconds,
         stdout_path=stdout_path,
         stderr_path=stderr_path,
         outcome=outcome,

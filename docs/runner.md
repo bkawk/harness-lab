@@ -41,6 +41,12 @@ Even with the simulated backend, the runner now writes first-class trace artifac
 - `traces/runner_stdout.log`
 - `traces/runner_stderr.log`
 
+For command backends, the runner also writes:
+
+- `traces/live_command.json`
+
+That file is refreshed while the backend is still running, so the lab can observe liveness and finish as soon as the command actually exits instead of treating the whole run as one blind wait.
+
 That means the candidate workspace already preserves command-level execution evidence rather than only a structured outcome summary.
 
 ## Command Backend Contract
@@ -83,6 +89,10 @@ The command backend receives these environment variables:
 - `HARNESS_LAB_DATASET_PATH`
 - `HARNESS_LAB_HARDWARE_ENVIRONMENT`
 - `HARNESS_LAB_HOSTNAME`
+
+The runner itself can be tuned with:
+
+- `HARNESS_LAB_RUNNER_POLL_SECONDS`
 
 The backend command must write JSON to `HARNESS_LAB_RESULT_PATH` with:
 
