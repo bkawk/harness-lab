@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from harness_lab.science_backend import ScienceConfig
+    from harness_lab.science_config import ScienceConfig
 
 
 def classify_outcome(benchmark_metrics: dict[str, float], audit_metrics: dict[str, float], steps: int) -> tuple[str, list[str]]:

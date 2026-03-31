@@ -53,6 +53,11 @@ RESPONSE_RULES = (
         "match": "Add named stratified evaluation slices",
         "response_summary": "Added named stratified evaluation slices so prepared datasets can separate benchmark, smoke, and audit behavior more clearly.",
     },
+    {
+        "kind": "seed_backend",
+        "match": "Modularize science",
+        "response_summary": "Split the seed backend into more explicit evolvable modules so the lab can steer model, loss, eval, and config changes more precisely.",
+    },
 )
 
 

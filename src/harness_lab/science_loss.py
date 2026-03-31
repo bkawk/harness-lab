@@ -6,7 +6,7 @@ import torch
 import torch.nn.functional as F
 
 if TYPE_CHECKING:
-    from harness_lab.science_backend import ScienceConfig
+    from harness_lab.science_config import ScienceConfig
 
 
 def compute_instance_loss(instance_embed: torch.Tensor, labels: torch.Tensor, instance_ids: torch.Tensor, margin: float) -> torch.Tensor:

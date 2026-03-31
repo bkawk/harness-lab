@@ -110,6 +110,8 @@ def _science_backend_fingerprints(relative_path: str, parent_lines: list[str], c
         "src/harness_lab/science_backend.py",
         "src/harness_lab/science_model.py",
         "src/harness_lab/science_loss.py",
+        "src/harness_lab/science_eval.py",
+        "src/harness_lab/science_config.py",
     }:
         return []
     joined = "".join(parent_lines) + "\n" + "".join(child_lines)
