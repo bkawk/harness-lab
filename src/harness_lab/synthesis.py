@@ -72,6 +72,11 @@ def _llm_parent_prompt(index: dict, ranked: list[ParentCandidateScore], hindsigh
             "environment_hint": hardware_profile.get("environment_hint", ""),
             "cpu_count": hardware_profile.get("cpu_count"),
             "memory_gb_estimate": hardware_profile.get("memory_gb_estimate"),
+            "cuda_available": hardware_profile.get("cuda_available"),
+            "gpu_count": hardware_profile.get("gpu_count"),
+            "gpu_name": hardware_profile.get("gpu_name", ""),
+            "gpu_memory_total_gb": hardware_profile.get("gpu_memory_total_gb"),
+            "gpu_memory_free_gb": hardware_profile.get("gpu_memory_free_gb"),
         },
     }
     return (

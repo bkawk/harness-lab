@@ -145,6 +145,11 @@ def build_decision_bundle(
             "environment_hint": hardware.get("environment_hint", ""),
             "cpu_count": hardware.get("cpu_count"),
             "memory_gb_estimate": hardware.get("memory_gb_estimate"),
+            "cuda_available": hardware.get("cuda_available"),
+            "gpu_count": hardware.get("gpu_count"),
+            "gpu_name": hardware.get("gpu_name", ""),
+            "gpu_memory_total_gb": hardware.get("gpu_memory_total_gb"),
+            "gpu_memory_free_gb": hardware.get("gpu_memory_free_gb"),
             "hostname": hardware.get("hostname", ""),
         },
         "external_review": {
@@ -241,6 +246,11 @@ def build_bootstrap_snapshot(
             "environment_hint": hardware.get("environment_hint", ""),
             "cpu_count": hardware.get("cpu_count"),
             "memory_gb_estimate": hardware.get("memory_gb_estimate"),
+            "cuda_available": hardware.get("cuda_available"),
+            "gpu_count": hardware.get("gpu_count"),
+            "gpu_name": hardware.get("gpu_name", ""),
+            "gpu_memory_total_gb": hardware.get("gpu_memory_total_gb"),
+            "gpu_memory_free_gb": hardware.get("gpu_memory_free_gb"),
         },
         "external_review_summary": {
             "status": external_review.get("status", ""),

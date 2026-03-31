@@ -21,6 +21,11 @@ def main() -> None:
     print(f"machine:          {profile.machine}")
     print(f"cpu_count:        {profile.cpu_count}")
     print(f"memory_gb:        {profile.memory_gb_estimate}")
+    print(f"cuda_available:   {profile.cuda_available}")
+    print(f"gpu_count:        {profile.gpu_count}")
+    print(f"gpu_name:         {profile.gpu_name}")
+    print(f"gpu_total_gb:     {profile.gpu_memory_total_gb}")
+    print(f"gpu_free_gb:      {profile.gpu_memory_free_gb}")
     print(f"environment_hint: {profile.environment_hint}")
 
 
