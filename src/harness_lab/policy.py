@@ -17,6 +17,8 @@ def default_policy() -> dict:
         "selection_mode": "balanced",
         "cooldown_multiplier": 1.0,
         "underexplored_bonus": 20,
+        "backend_fingerprint_bonus": 10,
+        "backend_fingerprint_cooldown": 12,
         "preferred_runner_backend": "simulated",
         "publish_every_cycles": 1,
         "novelty_cycle_priority": "normal",
@@ -40,10 +42,14 @@ def build_policy(candidates_dir: Path, memory_dir: Path) -> dict:
     policy_adjustments = [str(item) for item in hindsight.get("policy_adjustments", []) if str(item).strip()]
     over_explored = hindsight.get("over_explored_mechanisms", [])
     under_explored = hindsight.get("under_explored_promising_mechanisms", [])
+    over_backend = hindsight.get("over_explored_backend_fingerprints", [])
+    under_backend = hindsight.get("under_explored_backend_fingerprints", [])
 
     selection_mode = "balanced"
     cooldown_multiplier = 1.0
     underexplored_bonus = 20
+    backend_fingerprint_bonus = 10
+    backend_fingerprint_cooldown = 12
     publish_every_cycles = 1
     novelty_cycle_priority = "normal"
     summary = "Use a balanced policy until stronger hindsight accumulates."
@@ -58,9 +64,19 @@ def build_policy(candidates_dir: Path, memory_dir: Path) -> dict:
         cooldown_multiplier = 1.5
         summary = "Increase cooldown pressure on over-explored mechanisms while favoring promising lines."
         evidence.append("policy:overexplored_cooldown")
+    if over_backend:
+        backend_fingerprint_cooldown = 18
+        summary = "Cool down backend change types that hindsight says have been over-explored."
+        evidence.append("policy:backend_fingerprint_cooldown")
+    if under_backend:
+        backend_fingerprint_bonus = 16
+        if selection_mode == "balanced":
+            summary = "Bias the lab toward backend science changes that hindsight says were under-explored but promising."
+        evidence.append("policy:backend_fingerprint_bonus")
     if top_outcomes.get("train_error", 0) >= 1 or top_failure_modes.get("trace_capture_gap", 0) >= 1:
         selection_mode = "stabilize"
         cooldown_multiplier = max(cooldown_multiplier, 1.8)
+        backend_fingerprint_cooldown = max(backend_fingerprint_cooldown, 20)
         publish_every_cycles = 1
         summary = "Stabilize the lab after brittle outcomes before pushing wider exploration."
         evidence.append("policy:stabilize_after_errors")
@@ -91,6 +107,8 @@ def build_policy(candidates_dir: Path, memory_dir: Path) -> dict:
         "selection_mode": selection_mode,
         "cooldown_multiplier": cooldown_multiplier,
         "underexplored_bonus": underexplored_bonus,
+        "backend_fingerprint_bonus": backend_fingerprint_bonus,
+        "backend_fingerprint_cooldown": backend_fingerprint_cooldown,
         "preferred_runner_backend": preferred_runner_backend,
         "publish_every_cycles": publish_every_cycles,
         "novelty_cycle_priority": novelty_cycle_priority,

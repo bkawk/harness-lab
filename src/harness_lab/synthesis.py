@@ -135,10 +135,27 @@ def _apply_hindsight_preference(score: ParentCandidateScore, summary: dict, hind
         for item in hindsight.get("under_explored_promising_mechanisms", [])
         if str(item.get("mechanism", "")).strip()
     }
+    over_backend = {
+        str(item.get("fingerprint", "")).strip()
+        for item in hindsight.get("over_explored_backend_fingerprints", [])
+        if str(item.get("fingerprint", "")).strip()
+    }
+    under_backend = {
+        str(item.get("fingerprint", "")).strip()
+        for item in hindsight.get("under_explored_backend_fingerprints", [])
+        if str(item.get("fingerprint", "")).strip()
+    }
     policy_text = " ".join(str(item) for item in hindsight.get("policy_adjustments", []))
+    backend_fingerprints = {
+        str(item).strip()
+        for item in summary.get("backend_fingerprints", [])
+        if str(item).strip()
+    }
 
     cooldown_multiplier = float(policy.get("cooldown_multiplier", 1.0) or 1.0)
     underexplored_bonus = int(policy.get("underexplored_bonus", 20) or 20)
+    backend_fingerprint_bonus = int(policy.get("backend_fingerprint_bonus", 10) or 10)
+    backend_fingerprint_cooldown = int(policy.get("backend_fingerprint_cooldown", 12) or 12)
     budget_items = {
         str(item.get("mechanism", "")).strip(): item
         for item in budget.get("mechanism_budgets", [])
@@ -152,6 +169,16 @@ def _apply_hindsight_preference(score: ParentCandidateScore, summary: dict, hind
     if mechanism in under_explored:
         total += underexplored_bonus
         reasons.append(f"hindsight_under_explored={underexplored_bonus}")
+    matched_under_backend = sorted(backend_fingerprints & under_backend)
+    if matched_under_backend:
+        bonus = backend_fingerprint_bonus * len(matched_under_backend)
+        total += bonus
+        reasons.append(f"backend_fingerprint_under_explored={bonus}")
+    matched_over_backend = sorted(backend_fingerprints & over_backend)
+    if matched_over_backend:
+        penalty = backend_fingerprint_cooldown * len(matched_over_backend)
+        total -= penalty
+        reasons.append(f"backend_fingerprint_over_explored=-{penalty}")
     if "transfer stability" in policy_text.lower() and summary.get("outcome_label") == "audit_blocked":
         total += 12
         reasons.append("hindsight_transfer_stability=12")

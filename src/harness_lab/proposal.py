@@ -178,6 +178,16 @@ def _hindsight_change_items(hindsight: dict, mechanism: str) -> tuple[dict, ...]
         for item in hindsight.get("under_explored_promising_mechanisms", [])
         if str(item.get("mechanism", "")).strip()
     }
+    over_backend = {
+        str(item.get("fingerprint", "")).strip()
+        for item in hindsight.get("over_explored_backend_fingerprints", [])
+        if str(item.get("fingerprint", "")).strip()
+    }
+    under_backend = {
+        str(item.get("fingerprint", "")).strip()
+        for item in hindsight.get("under_explored_backend_fingerprints", [])
+        if str(item.get("fingerprint", "")).strip()
+    }
     if mechanism and mechanism in over_explored:
         items.append(
             {
@@ -192,6 +202,22 @@ def _hindsight_change_items(hindsight: dict, mechanism: str) -> tuple[dict, ...]
                 "kind": "hindsight_priority",
                 "mechanism": mechanism,
                 "summary": f"Lean into `{mechanism}` because hindsight says it was under-explored relative to its evidence.",
+            }
+        )
+    for fingerprint in sorted(under_backend)[:2]:
+        items.append(
+            {
+                "kind": "backend_hindsight_priority",
+                "mechanism": fingerprint,
+                "summary": f"Bias toward backend change type `{fingerprint}` because hindsight says it is promising and under-explored.",
+            }
+        )
+    for fingerprint in sorted(over_backend)[:2]:
+        items.append(
+            {
+                "kind": "backend_hindsight_guardrail",
+                "mechanism": fingerprint,
+                "summary": f"Use caution around backend change type `{fingerprint}` because hindsight says it has been over-explored.",
             }
         )
     for adjustment in hindsight.get("policy_adjustments", [])[:2]:
@@ -472,6 +498,8 @@ def draft_proposal_for_candidate(
                 "policy_adjustments": hindsight.get("policy_adjustments", [])[:3],
                 "over_explored_mechanisms": hindsight.get("over_explored_mechanisms", [])[:3],
                 "under_explored_promising_mechanisms": hindsight.get("under_explored_promising_mechanisms", [])[:3],
+                "over_explored_backend_fingerprints": hindsight.get("over_explored_backend_fingerprints", [])[:3],
+                "under_explored_backend_fingerprints": hindsight.get("under_explored_backend_fingerprints", [])[:3],
             },
             "policy_context": policy,
             "budget_context": budget,
