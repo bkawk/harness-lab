@@ -10,7 +10,7 @@ from harness_lab.backend import read_backend_profile, write_backend_profile
 from harness_lab.budget import read_budget, write_budget
 from harness_lab.diversity import read_diversity, write_diversity
 from harness_lab.external_review import maybe_request_external_review, read_external_review
-from harness_lab.human_feedback import read_human_feedback, write_human_feedback
+from harness_lab.human_feedback import read_human_feedback, read_human_feedback_responses, write_human_feedback
 from harness_lab.hindsight import write_hindsight
 from harness_lab.memory import build_candidate_index
 from harness_lab.orchestrator import GENESIS_CANDIDATE_ID, LabStepResult, next_candidate_id, run_lab_step
@@ -95,6 +95,7 @@ def render_big_bang_markdown(
     backend = {}
     external_review = {}
     human_feedback = {}
+    human_feedback_responses = {}
     science_summary = {}
     live_command = {}
     if candidates_dir.exists():
@@ -120,6 +121,7 @@ def render_big_bang_markdown(
         backend = json.loads(backend_path.read_text(encoding="utf-8"))
     external_review = read_external_review(memory_dir)
     human_feedback = read_human_feedback(memory_dir)
+    human_feedback_responses = read_human_feedback_responses(memory_dir)
     if science_summary_path.exists():
         science_summary = json.loads(science_summary_path.read_text(encoding="utf-8"))
     active_candidate_id = str(state.get("active_candidate_id", "") or "")
@@ -147,6 +149,12 @@ def render_big_bang_markdown(
     ]
     if not ranked_human_lines:
         ranked_human_lines = ["- the lab has no ranked human requests yet"]
+    response_lines = [
+        f"- `{item.get('kind', '')}` addressed by `{str(item.get('commit_sha', ''))[:7]}`: `{item.get('response_summary', '')}`"
+        for item in human_feedback_responses.get("responses", [])[:5]
+    ]
+    if not response_lines:
+        response_lines = ["- no recent human responses recorded yet"]
 
     recent = list(index.get("candidates", []))[-5:]
     recent_lines = []
@@ -284,6 +292,10 @@ def render_big_bang_markdown(
             "## What The Lab Wants",
             f"- summary: `{human_feedback.get('summary', 'The lab has no human-facing requests yet.')}`",
             *ranked_human_lines,
+            "",
+            "## What We Did",
+            f"- summary: `{human_feedback_responses.get('summary', 'No recent human responses recorded yet.')}`",
+            *response_lines,
             "",
             "## Diversity",
             f"- summary: `{diversity.get('summary', 'No diversity yet.')}`",
