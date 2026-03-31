@@ -36,6 +36,7 @@ class ScienceConfig:
     instance_loss_weight: float = 0.05
     grad_clip: float = 1.0
     log_interval: int = 20
+    k_neighbors: int = 8
     instance_dim: int = 16
     instance_margin: float = 0.35
     time_budget_seconds: int = 600
@@ -59,10 +60,17 @@ class ScienceRunResult:
 
 
 class CompactPointModel(nn.Module):
-    def __init__(self, num_classes: int, param_dim: int, hidden_dim: int, global_dim: int, instance_dim: int):
+    def __init__(self, num_classes: int, param_dim: int, hidden_dim: int, global_dim: int, instance_dim: int, k_neighbors: int):
         super().__init__()
+        self.k_neighbors = k_neighbors
         self.point_encoder = nn.Sequential(
             nn.Linear(6, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.ReLU(),
+        )
+        self.local_mlp = nn.Sequential(
+            nn.Linear((2 * hidden_dim) + 6, hidden_dim),
             nn.ReLU(),
             nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(),
@@ -71,7 +79,7 @@ class CompactPointModel(nn.Module):
             nn.Linear(2 * hidden_dim, global_dim),
             nn.ReLU(),
         )
-        fused_dim = hidden_dim + global_dim
+        fused_dim = (2 * hidden_dim) + global_dim
         self.classifier = nn.Sequential(
             nn.Linear(fused_dim, hidden_dim),
             nn.ReLU(),
@@ -95,15 +103,42 @@ class CompactPointModel(nn.Module):
 
     def forward(self, points: torch.Tensor, normals: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         features = self.point_encoder(torch.cat([points, normals], dim=-1))
-        global_max = features.max(dim=1, keepdim=True).values
-        global_mean = features.mean(dim=1, keepdim=True)
+        neighbor_idx = knn_indices(points, self.k_neighbors)
+        neighbor_feat = gather_neighbors(features, neighbor_idx)
+        neighbor_points = gather_neighbors(points, neighbor_idx)
+        neighbor_normals = gather_neighbors(normals, neighbor_idx)
+        center_feat = features.unsqueeze(2).expand_as(neighbor_feat)
+        rel_points = neighbor_points - points.unsqueeze(2)
+        rel_normals = neighbor_normals - normals.unsqueeze(2)
+        edge_feat = torch.cat([center_feat, neighbor_feat - center_feat, rel_points, rel_normals], dim=-1)
+        local_feat = self.local_mlp(edge_feat).max(dim=2).values
+        global_max = local_feat.max(dim=1, keepdim=True).values
+        global_mean = local_feat.mean(dim=1, keepdim=True)
         global_feat = self.global_proj(torch.cat([global_max, global_mean], dim=-1))
-        fused = torch.cat([features, global_feat.expand(-1, points.size(1), -1)], dim=-1)
+        fused = torch.cat([features, local_feat, global_feat.expand(-1, points.size(1), -1)], dim=-1)
         logits = self.classifier(fused)
         params = self.param_head(fused)
         boundary = self.boundary_head(fused).squeeze(-1)
         instance = F.normalize(self.instance_head(fused), dim=-1)
         return logits, params, boundary, instance
+
+
+def knn_indices(points: torch.Tensor, k: int) -> torch.Tensor:
+    num_points = points.size(1)
+    if num_points <= 1:
+        return torch.zeros((points.size(0), num_points, 1), dtype=torch.long, device=points.device)
+    k = max(1, min(k, num_points - 1))
+    with torch.no_grad():
+        dist = torch.cdist(points, points)
+        _, indices = dist.topk(k + 1, dim=-1, largest=False)
+    return indices[:, :, 1:]
+
+
+def gather_neighbors(x: torch.Tensor, indices: torch.Tensor) -> torch.Tensor:
+    batch_size, num_points, channels = x.shape
+    k = indices.size(-1)
+    batch_idx = torch.arange(batch_size, device=x.device).view(batch_size, 1, 1).expand(-1, num_points, k)
+    return x[batch_idx, indices]
 
 
 def _proposal_signature(proposal: dict) -> str:
@@ -132,12 +167,14 @@ def derive_config(candidate_id: str, proposal: dict, diagnosis: dict) -> Science
     instance_choices = [12, 16, 24]
     boundary_choices = [0.05, 0.1, 0.15]
     instance_loss_choices = [0.02, 0.05, 0.08]
+    neighbor_choices = [6, 8, 10]
     budget_choices = [540, 600, 660]
 
     cfg = ScienceConfig(
         lr=lr_choices[_deterministic_index(signature + "lr", len(lr_choices))],
         hidden_dim=hidden_choices[_deterministic_index(signature + "hidden", len(hidden_choices))],
         global_dim=global_choices[_deterministic_index(signature + "global", len(global_choices))],
+        k_neighbors=neighbor_choices[_deterministic_index(signature + "neighbors", len(neighbor_choices))],
         instance_dim=instance_choices[_deterministic_index(signature + "instance_dim", len(instance_choices))],
         boundary_loss_weight=boundary_choices[_deterministic_index(signature + "boundary", len(boundary_choices))],
         instance_loss_weight=instance_loss_choices[_deterministic_index(signature + "instance_loss", len(instance_loss_choices))],
@@ -153,9 +190,23 @@ def derive_config(candidate_id: str, proposal: dict, diagnosis: dict) -> Science
             **{**asdict(cfg), "lr": min(cfg.lr, 2.5e-4), "weight_decay": 2e-4, "instance_loss_weight": min(cfg.instance_loss_weight, 0.04)}
         )
     if "budget_guardrail" in change_kinds or "diversity_warning" in change_kinds:
-        cfg = ScienceConfig(**{**asdict(cfg), "hidden_dim": min(cfg.hidden_dim, 128), "global_dim": min(cfg.global_dim, 192)})
+        cfg = ScienceConfig(
+            **{
+                **asdict(cfg),
+                "hidden_dim": min(cfg.hidden_dim, 128),
+                "global_dim": min(cfg.global_dim, 192),
+                "k_neighbors": min(cfg.k_neighbors, 8),
+            }
+        )
     if "exploration_jump" in change_kinds:
-        cfg = ScienceConfig(**{**asdict(cfg), "instance_dim": max(cfg.instance_dim, 16), "instance_loss_weight": min(0.1, cfg.instance_loss_weight + 0.02)})
+        cfg = ScienceConfig(
+            **{
+                **asdict(cfg),
+                "instance_dim": max(cfg.instance_dim, 16),
+                "instance_loss_weight": min(0.1, cfg.instance_loss_weight + 0.02),
+                "k_neighbors": max(cfg.k_neighbors, 8),
+            }
+        )
     override = os.environ.get("HARNESS_LAB_SCIENCE_TIME_BUDGET_SECONDS", "").strip()
     if override:
         cfg = ScienceConfig(**{**asdict(cfg), "time_budget_seconds": int(float(override))})
@@ -269,6 +320,7 @@ def run_science_backend(
         hidden_dim=cfg.hidden_dim,
         global_dim=cfg.global_dim,
         instance_dim=cfg.instance_dim,
+        k_neighbors=cfg.k_neighbors,
     ).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
 
