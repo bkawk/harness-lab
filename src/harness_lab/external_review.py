@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
+
+log = logging.getLogger("harness_lab.external_review")
 
 from harness_lab.hindsight import read_hindsight
 from harness_lab.llm import run_claude_json
@@ -246,7 +249,12 @@ def _run_llm_review(index: dict, hindsight: dict, policy: dict, trigger_reason: 
         return None
     prompt = _llm_review_prompt(index, hindsight, policy, trigger_reason, candidate_count)
     payload = run_claude_json(prompt, cwd=memory_dir.parent.parent)
-    return _normalize_review_payload(payload, "claude") if payload else None
+    result = _normalize_review_payload(payload, "claude") if payload else None
+    if result:
+        log.info("external review authored by claude (trigger=%s)", trigger_reason)
+    else:
+        log.warning("external review: claude fallback (trigger=%s, payload=%s)", trigger_reason, "empty" if not payload else "invalid")
+    return result
 
 
 def _run_command_review(memory_dir: Path, trigger_reason: str) -> dict | None:

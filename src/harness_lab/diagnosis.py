@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import json
+import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
+
+log = logging.getLogger("harness_lab.diagnosis")
 
 from harness_lab.llm import run_claude_json
 from harness_lab.memory import read_json
@@ -146,7 +150,7 @@ def _heuristic_reconciled_fields(diagnosis: dict, outcome: dict, target: dict) -
     }
 
 
-def _llm_diagnosis_prompt(candidate_id: str, proposal: dict, outcome: dict, heuristic_fields: dict, traces: dict) -> str:
+def _llm_diagnosis_prompt(candidate_id: str, proposal: dict, outcome: dict, heuristic_fields: dict, traces: dict, parent_diagnosis: dict | None = None) -> str:
     payload = {
         "candidate_id": candidate_id,
         "proposal": {
@@ -158,14 +162,22 @@ def _llm_diagnosis_prompt(candidate_id: str, proposal: dict, outcome: dict, heur
         "heuristic_fallback": heuristic_fields,
         "traces": traces,
     }
-    import json
-
+    if parent_diagnosis:
+        payload["parent_diagnosis"] = {
+            "summary": parent_diagnosis.get("summary", ""),
+            "severity": parent_diagnosis.get("severity", ""),
+            "mechanism": parent_diagnosis.get("mechanism", ""),
+            "failure_modes": parent_diagnosis.get("failure_modes", []),
+            "counterfactuals": parent_diagnosis.get("counterfactuals", [])[:5],
+        }
     return (
         "You are reconciling a harness-lab diagnosis from outcome evidence.\n"
         "Return only JSON with keys: summary, severity, mechanism, failure_modes, evidence, counterfactuals.\n"
         "severity must be one of: unknown, low, medium, high, critical.\n"
         "failure_modes, evidence, and counterfactuals must be arrays of strings.\n"
-        "Keep the diagnosis grounded in the provided proposal, outcome, and traces.\n\n"
+        "Keep the diagnosis grounded in the provided proposal, outcome, and traces.\n"
+        "If parent_diagnosis is provided, compare this candidate's outcome against the parent "
+        "and note whether it improved, regressed, or showed the same failure modes.\n\n"
         f"{json.dumps(payload, indent=2, sort_keys=True)}"
     )
 
@@ -224,7 +236,10 @@ def reconcile_diagnosis_from_outcome(candidates_dir: Path, candidate_id: str) ->
         )
         normalized = _normalize_llm_diagnosis_payload(payload or {}, heuristic_fields)
         if normalized:
+            log.info("diagnosis authored by claude for %s", candidate_id)
             llm_fields = normalized
+        else:
+            log.warning("diagnosis: claude fallback to heuristic for %s (payload=%s)", candidate_id, "empty" if not payload else "invalid")
 
     return update_diagnosis(
         candidates_dir,

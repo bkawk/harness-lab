@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from pathlib import Path
+
+log = logging.getLogger("harness_lab.policy")
 
 from harness_lab.backend import read_backend_profile, write_backend_profile
 from harness_lab.diversity import read_diversity
@@ -36,6 +39,8 @@ def _llm_policy_prompt(index: dict, hindsight: dict, diversity: dict, hardware: 
         "hindsight_summary": hindsight.get("summary", ""),
         "hindsight_findings": hindsight.get("hindsight_findings", [])[:8],
         "policy_adjustments": hindsight.get("policy_adjustments", [])[:8],
+        "process_classification_counts": hindsight.get("process_classification_counts", {}),
+        "throughput_summary": hindsight.get("throughput_summary", {}),
         "diversity_summary": diversity.get("summary", ""),
         "hardware_summary": {
             "environment_hint": hardware.get("environment_hint", ""),
@@ -221,7 +226,9 @@ def build_policy(candidates_dir: Path, memory_dir: Path) -> dict:
         )
         normalized = _normalize_llm_policy_payload(llm_payload or {}, payload)
         if normalized:
+            log.info("policy authored by claude")
             return normalized
+        log.warning("policy: claude fallback to heuristic (payload=%s)", "empty" if not llm_payload else "invalid")
     return payload
 
 

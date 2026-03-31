@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from pathlib import Path
+
+log = logging.getLogger("harness_lab.hindsight")
 
 from harness_lab.llm import run_claude_json
 from harness_lab.memory import build_candidate_index
@@ -360,7 +363,9 @@ def build_hindsight(candidates_dir: Path) -> dict:
         llm_payload = run_claude_json(_llm_hindsight_prompt(index, payload), cwd=candidates_dir.parent.parent)
         normalized = _normalize_llm_hindsight_payload(llm_payload or {}, payload)
         if normalized:
+            log.info("hindsight authored by claude")
             return normalized
+        log.warning("hindsight: claude fallback to heuristic (payload=%s)", "empty" if not llm_payload else "invalid")
     return payload
 
 
@@ -389,6 +394,4 @@ def read_hindsight(memory_dir: Path) -> dict:
             "process_classification_counts": {},
             "throughput_summary": {},
         }
-    import json
-
     return json.loads(path.read_text(encoding="utf-8"))

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
+
+log = logging.getLogger("harness_lab.proposal")
 
 from harness_lab.bootstrap import write_bootstrap_snapshot
 from harness_lab.budget import read_budget
@@ -503,7 +506,9 @@ def _maybe_llm_author_proposal(
     )
     normalized = _normalize_llm_proposal_payload(payload or {}, fallback_target, fallback_changes, fallback_rationale)
     if not normalized:
+        log.warning("proposal: claude fallback to heuristic (payload=%s)", "empty" if not payload else "invalid")
         return fallback_rationale, fallback_target, fallback_changes
+    log.info("proposal authored by claude")
     return normalized
 
 

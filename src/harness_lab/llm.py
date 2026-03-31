@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import subprocess
 from pathlib import Path
+
+log = logging.getLogger("harness_lab.llm")
 
 
 def _extract_json_object(text: str) -> dict | None:
@@ -27,6 +30,7 @@ def _extract_json_object(text: str) -> dict | None:
 
 def run_claude_json(prompt: str, *, cwd: Path) -> dict | None:
     claude_bin = os.environ.get("HARNESS_LAB_CLAUDE_BIN", "claude").strip() or "claude"
+    timeout = int(os.environ.get("HARNESS_LAB_LLM_TIMEOUT_SECONDS", "120") or 120)
     args = [claude_bin, "-p", prompt]
     try:
         completed = subprocess.run(
@@ -34,10 +38,23 @@ def run_claude_json(prompt: str, *, cwd: Path) -> dict | None:
             cwd=str(cwd),
             capture_output=True,
             text=True,
-            timeout=int(os.environ.get("HARNESS_LAB_LLM_TIMEOUT_SECONDS", "120") or 120),
+            timeout=timeout,
         )
-    except (OSError, subprocess.SubprocessError):
+    except subprocess.TimeoutExpired:
+        log.warning("claude call timed out after %ds", timeout)
+        return None
+    except OSError as exc:
+        log.warning("claude binary not found or not executable: %s", exc)
+        return None
+    except subprocess.SubprocessError as exc:
+        log.warning("claude subprocess error: %s", exc)
         return None
     if completed.returncode != 0:
+        stderr_snippet = (completed.stderr or "").strip()[:200]
+        log.warning("claude exited %d: %s", completed.returncode, stderr_snippet)
         return None
-    return _extract_json_object(completed.stdout)
+    result = _extract_json_object(completed.stdout)
+    if result is None:
+        stdout_snippet = (completed.stdout or "").strip()[:200]
+        log.warning("claude returned non-JSON output: %s", stdout_snippet)
+    return result

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
+
+log = logging.getLogger("harness_lab.execution")
 
 from harness_lab.datasets import get_dataset_record
 from harness_lab.hardware import read_hardware_profile
@@ -204,7 +207,10 @@ def plan_execution_for_candidate(candidates_dir: Path, candidate_id: str) -> Exe
         )
         normalized = _normalize_llm_execution_payload(payload or {}, heuristic_fields)
         if normalized:
+            log.info("execution plan authored by claude for %s", candidate_id)
             fields = normalized
+        else:
+            log.warning("execution: claude fallback to heuristic for %s (payload=%s)", candidate_id, "empty" if not payload else "invalid")
 
     plan = ExecutionPlan(
         candidate_id=candidate_id,

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
+
+log = logging.getLogger("harness_lab.synthesis")
 
 from harness_lab.budget import read_budget, write_budget
 from harness_lab.diversity import write_diversity
@@ -100,10 +103,12 @@ def _apply_llm_parent_selection(
         cwd=cwd,
     )
     if not isinstance(payload, dict):
+        log.warning("parent selection: claude returned non-dict, keeping heuristic ranking")
         return ranked, {}
     top_parent_id = str(payload.get("top_parent_id", "")).strip()
     valid_ids = {item.candidate_id for item in ranked}
     if top_parent_id not in valid_ids:
+        log.warning("parent selection: claude chose invalid parent %r, keeping heuristic ranking", top_parent_id)
         return ranked, {}
 
     adjustments: dict[str, tuple[int, str]] = {}
@@ -140,6 +145,7 @@ def _apply_llm_parent_selection(
             )
         )
     revised.sort(key=lambda item: (-item.total_score, item.candidate_id))
+    log.info("parent selection authored by claude: top_parent=%s", top_parent_id)
     return revised, {
         "reviewer": "claude",
         "top_parent_id": top_parent_id,

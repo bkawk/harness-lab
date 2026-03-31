@@ -33,6 +33,12 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
+    import logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(name)s %(levelname)s %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
     args = build_parser().parse_args()
     result = run_big_bang(
         repo_dir=Path(args.repo_dir).resolve(),
