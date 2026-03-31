@@ -99,6 +99,7 @@ Right now `harness-lab` can:
 - `docs/policy.md`
 - `docs/budget.md`
 - `docs/diversity.md`
+- `docs/backend_science_plan.md`
 
 ## Quick Start
 
