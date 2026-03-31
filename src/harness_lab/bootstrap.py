@@ -70,6 +70,7 @@ def build_decision_bundle(
 ) -> dict:
     index = build_candidate_index(candidates_dir)
     science_summary = read_json(memory_dir / "science_summary.json") if (memory_dir / "science_summary.json").exists() else {}
+    science_debug_summary = read_json(memory_dir / "science_debug_summary.json") if (memory_dir / "science_debug_summary.json").exists() else {}
     hindsight = read_hindsight(memory_dir)
     policy = read_policy(memory_dir)
     budget = read_budget(memory_dir)
@@ -118,6 +119,7 @@ def build_decision_bundle(
         "candidate_count": int(index.get("candidate_count", 0) or 0),
         "dataset_context": dataset_record or {},
         "science_summary": science_summary,
+        "science_debug_summary": science_debug_summary,
         "leaders": science_summary.get("leaders", {}),
         "recent_scored_candidates": finished_scored[-5:],
         "pending_candidates": pending_candidates[-8:],
@@ -182,6 +184,7 @@ def build_bootstrap_snapshot(
 ) -> dict:
     index = read_json(memory_dir / "candidate_index.json") if (memory_dir / "candidate_index.json").exists() else {"candidate_count": 0, "candidates": []}
     science_summary = read_json(memory_dir / "science_summary.json") if (memory_dir / "science_summary.json").exists() else {}
+    science_debug_summary = read_json(memory_dir / "science_debug_summary.json") if (memory_dir / "science_debug_summary.json").exists() else {}
     hindsight = read_hindsight(memory_dir)
     policy = read_policy(memory_dir)
     budget = read_budget(memory_dir)
@@ -222,6 +225,12 @@ def build_bootstrap_snapshot(
             "trend_summary": science_summary.get("trend_summary", ""),
             "leaders": science_summary.get("leaders", {}),
             "recent_trend": science_summary.get("recent_trend", {}),
+        },
+        "science_debug_summary": {
+            "summary": science_debug_summary.get("summary", ""),
+            "likely_issue": science_debug_summary.get("likely_issue", ""),
+            "recommended_fix": science_debug_summary.get("recommended_fix", ""),
+            "findings": science_debug_summary.get("findings", [])[:5],
         },
         "hindsight_summary": hindsight.get("summary", ""),
         "policy_summary": policy.get("summary", ""),

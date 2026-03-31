@@ -327,3 +327,115 @@ def write_science_summary(candidates_dir: Path, output_path: Path, recent_window
     payload = build_science_summary(candidates_dir, recent_window=recent_window)
     output_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return output_path
+
+
+def build_science_debug_summary(candidates_dir: Path, recent_window: int = 8) -> dict:
+    index = build_candidate_index(candidates_dir)
+    candidates = list(index.get("candidates", []))
+    recent = candidates[-recent_window:]
+
+    rows: list[dict] = []
+    full_budget_training_without_result = 0
+    startup_failures = 0
+    oom_failures = 0
+    completed_with_scores = 0
+    late_training_stalls = 0
+
+    for item in recent:
+        candidate_id = str(item.get("candidate_id", "")).strip()
+        trace_dir = candidates_dir / candidate_id / "traces"
+        run_payload = read_json(trace_dir / "run.json") if (trace_dir / "run.json").exists() else {}
+        progress_payload = read_json(trace_dir / "science_progress.json") if (trace_dir / "science_progress.json").exists() else {}
+        backend_result_exists = (trace_dir / "backend_result.json").exists()
+        science_metrics_exists = (trace_dir / "science_metrics.json").exists()
+        duration_seconds = run_payload.get("duration_seconds")
+        process_classification = str((run_payload.get("process_classification") or {}).get("classification", "")).strip()
+        phase = str(progress_payload.get("phase", "")).strip()
+        steps = progress_payload.get("steps")
+        elapsed_seconds = progress_payload.get("elapsed_seconds")
+        peak_vram_mb = progress_payload.get("peak_vram_mb")
+        observed_failure_modes = [str(mode).strip() for mode in item.get("observed_failure_modes", []) if str(mode).strip()]
+
+        row = {
+            "candidate_id": candidate_id,
+            "outcome_label": item.get("outcome_label", ""),
+            "process_classification": process_classification,
+            "phase": phase,
+            "steps": steps,
+            "elapsed_seconds": elapsed_seconds,
+            "duration_seconds": duration_seconds,
+            "backend_result_exists": backend_result_exists,
+            "science_metrics_exists": science_metrics_exists,
+            "observed_failure_modes": observed_failure_modes,
+            "peak_vram_mb": peak_vram_mb,
+        }
+        rows.append(row)
+
+        if item.get("benchmark_score") is not None or item.get("audit_score") is not None:
+            completed_with_scores += 1
+        if "startup_timeout" in observed_failure_modes:
+            startup_failures += 1
+        if {"cuda_oom", "oom", "vram_pressure"} & set(observed_failure_modes):
+            oom_failures += 1
+        if (
+            phase == "training"
+            and not backend_result_exists
+            and not science_metrics_exists
+            and isinstance(elapsed_seconds, (int, float))
+            and elapsed_seconds >= 540
+        ):
+            full_budget_training_without_result += 1
+            late_training_stalls += 1
+
+    findings: list[str] = []
+    if full_budget_training_without_result >= 2:
+        findings.append(
+            f"{full_budget_training_without_result} recent candidate(s) trained near the wall-clock limit but never wrote result artifacts."
+        )
+    if startup_failures >= 2:
+        findings.append(f"{startup_failures} recent candidate(s) still show startup-timeout behavior.")
+    if oom_failures >= 1:
+        findings.append(f"{oom_failures} recent candidate(s) hit explicit VRAM pressure or OOM conditions.")
+    if completed_with_scores == 0 and rows:
+        findings.append("None of the recent candidates completed with scored benchmark/audit results.")
+
+    likely_issue = ""
+    recommended_fix = ""
+    if full_budget_training_without_result >= 2:
+        likely_issue = "training_consumes_wall_clock_before_eval"
+        recommended_fix = "Reserve evaluation time or stop training before the wall-clock deadline so result artifacts can be written."
+    elif oom_failures >= 1:
+        likely_issue = "vram_pressure"
+        recommended_fix = "Reduce memory pressure or increase available VRAM so the backend can complete training and evaluation."
+    elif startup_failures >= 2:
+        likely_issue = "startup_progress_detection"
+        recommended_fix = "Expose startup progress earlier or relax startup detection for this backend."
+
+    summary = (
+        findings[0]
+        if findings
+        else "Recent candidates do not show a dominant science-debug failure pattern."
+    )
+
+    return {
+        "recent_window": recent_window,
+        "summary": summary,
+        "recent_candidates": rows,
+        "counts": {
+            "completed_with_scores": completed_with_scores,
+            "startup_failures": startup_failures,
+            "oom_failures": oom_failures,
+            "full_budget_training_without_result": full_budget_training_without_result,
+            "late_training_stalls": late_training_stalls,
+        },
+        "likely_issue": likely_issue,
+        "recommended_fix": recommended_fix,
+        "findings": findings,
+    }
+
+
+def write_science_debug_summary(candidates_dir: Path, output_path: Path, recent_window: int = 8) -> Path:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    payload = build_science_debug_summary(candidates_dir, recent_window=recent_window)
+    output_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return output_path

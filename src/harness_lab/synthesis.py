@@ -13,7 +13,7 @@ from harness_lab.diversity import write_diversity
 from harness_lab.hardware import read_hardware_profile
 from harness_lab.hindsight import read_hindsight, write_hindsight
 from harness_lab.llm import run_claude_json
-from harness_lab.memory import build_candidate_index, write_candidate_index, write_science_summary
+from harness_lab.memory import build_candidate_index, write_candidate_index, write_science_debug_summary, write_science_summary
 from harness_lab.policy import read_policy, write_policy
 from harness_lab.workspace import write_json
 
@@ -385,6 +385,7 @@ def refresh_memory_artifacts(candidates_dir: Path, memory_dir: Path) -> dict:
     memory_dir.mkdir(parents=True, exist_ok=True)
     write_candidate_index(candidates_dir, memory_dir / "candidate_index.json")
     write_science_summary(candidates_dir, memory_dir / "science_summary.json")
+    write_science_debug_summary(candidates_dir, memory_dir / "science_debug_summary.json")
     write_hindsight(candidates_dir, memory_dir / "hindsight.json")
     write_policy(candidates_dir, memory_dir, memory_dir / "policy.json")
     write_budget(memory_dir, memory_dir / "budget.json")

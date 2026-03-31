@@ -56,23 +56,35 @@ def _seed_candidate(tmp_path):
 
 def test_llm_diagnosis_can_override_summary(tmp_path, monkeypatch):
     candidates_dir = _seed_candidate(tmp_path)
+    memory_dir = tmp_path / "memory"
+    memory_dir.mkdir(parents=True, exist_ok=True)
     monkeypatch.setenv("HARNESS_LAB_LLM_DIAGNOSIS_ENABLED", "1")
-    monkeypatch.setattr(
-        diagnosis_module,
-        "run_claude_json",
-        lambda prompt, *, cwd: {
+    captured = {}
+
+    def _fake_run(prompt, *, cwd):
+        captured["prompt"] = prompt
+        return {
             "summary": "Benchmark improved but audit regressed, suggesting transfer collapse in fusion_changed.",
             "severity": "high",
             "mechanism": "fusion_changed",
             "failure_modes": ["transfer_collapse"],
             "evidence": ["science_metrics.json", "backend_result.json"],
             "counterfactuals": ["Try a narrower fusion adjustment with stronger transfer guardrails."],
-        },
+        }
+
+    write_json(candidates_dir / "cand_0001" / "traces" / "science_progress.json", {"phase": "training", "steps": 40})
+    write_json(memory_dir / "science_debug_summary.json", {"summary": "Recent candidates trained to the wall-clock limit.", "likely_issue": "training_consumes_wall_clock_before_eval"})
+    monkeypatch.setattr(
+        diagnosis_module,
+        "run_claude_json",
+        _fake_run,
     )
     updated = diagnosis_module.reconcile_diagnosis_from_outcome(candidates_dir, "cand_0001")
     assert updated.summary.startswith("Benchmark improved but audit regressed")
     assert updated.severity == "high"
     assert updated.mechanism == "fusion_changed"
+    assert '"science_progress"' in captured["prompt"]
+    assert '"science_debug_summary"' in captured["prompt"]
 
 
 def test_invalid_llm_diagnosis_falls_back_to_heuristic(tmp_path, monkeypatch):

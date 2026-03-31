@@ -228,6 +228,7 @@ def reconcile_diagnosis_from_outcome(candidates_dir: Path, candidate_id: str) ->
             "science_metrics": _safe_read_json(candidate_dir / "traces" / "science_metrics.json"),
             "science_progress": _safe_read_json(candidate_dir / "traces" / "science_progress.json"),
             "backend_result": _safe_read_json(candidate_dir / "traces" / "backend_result.json"),
+            "science_debug_summary": _safe_read_json(candidates_dir.parent / "memory" / "science_debug_summary.json"),
             "runner_stdout_tail": _safe_read_text(candidate_dir / "traces" / "runner_stdout.log"),
             "runner_stderr_tail": _safe_read_text(candidate_dir / "traces" / "runner_stderr.log"),
         }
