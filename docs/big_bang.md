@@ -6,18 +6,18 @@ The GitHub repo is the lab dashboard.
 - status: `running`
 - vital_spark_at: `2026-03-31T10:12:12+00:00`
 - started_at: `2026-03-31T15:49:29+00:00`
-- last_heartbeat: `2026-03-31T15:54:09+00:00`
-- cycles_completed: `4`
+- last_heartbeat: `2026-03-31T15:55:27+00:00`
+- cycles_completed: `5`
 - genesis seed: `cand_0001`
-- last candidate: `cand_0047`
+- last candidate: `cand_0048`
 - last dataset: `abc_boundary512`
 - last commit: `-`
 - last publish message: `Publishing skipped.`
 - last cycle mode: `novelty_cycle`
-- novelty cycles triggered: `1`
+- novelty cycles triggered: `2`
 
 ## Latest Step
-- candidate: `cand_0047`
+- candidate: `cand_0048`
 - dataset: `abc_boundary512` via `reused_prepared_dataset`
 - seed action: `existing`
 - proposal status: `candidate`
@@ -37,11 +37,11 @@ The GitHub repo is the lab dashboard.
 - backend_poll_interval_seconds: `-`
 
 ## Recent Candidates
+- `cand_0048`: outcome `stalled`; diagnosis `complete`; benchmark `None`
 - `cand_0047`: outcome `stalled`; diagnosis `complete`; benchmark `None`
 - `cand_0046`: outcome `stalled`; diagnosis `complete`; benchmark `None`
 - `cand_0045`: outcome `stalled`; diagnosis `complete`; benchmark `None`
 - `cand_0044`: outcome `stalled`; diagnosis `complete`; benchmark `None`
-- `cand_0043`: outcome `stalled`; diagnosis `complete`; benchmark `None`
 
 ## Science Leaders
 - best benchmark: `cand_0013` -> `0.3847249926656351`
@@ -100,6 +100,6 @@ The GitHub repo is the lab dashboard.
 - `evaluation` addressed by `930a088`: `Implemented a transfer-stability smoke gate before full audit.`
 
 ## Diversity
-- summary: `The lab has stayed on `initial_harness` for 4 recent candidates; inject a novelty step.`
-- current_mechanism_streak: `4`
+- summary: `The lab has stayed on `initial_harness` for 5 recent candidates; inject a novelty step.`
+- current_mechanism_streak: `5`
 - novelty_step_recommended: `True`
