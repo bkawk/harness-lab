@@ -39,6 +39,7 @@ class ScienceConfig:
     k_neighbors: int = 8
     instance_dim: int = 16
     instance_margin: float = 0.35
+    instance_modulation_scale: float = 0.1
     time_budget_seconds: int = 600
 
 
@@ -60,9 +61,19 @@ class ScienceRunResult:
 
 
 class CompactPointModel(nn.Module):
-    def __init__(self, num_classes: int, param_dim: int, hidden_dim: int, global_dim: int, instance_dim: int, k_neighbors: int):
+    def __init__(
+        self,
+        num_classes: int,
+        param_dim: int,
+        hidden_dim: int,
+        global_dim: int,
+        instance_dim: int,
+        k_neighbors: int,
+        instance_modulation_scale: float,
+    ):
         super().__init__()
         self.k_neighbors = k_neighbors
+        self.instance_modulation_scale = instance_modulation_scale
         self.point_encoder = nn.Sequential(
             nn.Linear(6, hidden_dim),
             nn.ReLU(),
@@ -95,6 +106,7 @@ class CompactPointModel(nn.Module):
             nn.ReLU(),
             nn.Linear(hidden_dim, 1),
         )
+        self.instance_class_proj = nn.Linear(num_classes, fused_dim)
         self.instance_head = nn.Sequential(
             nn.Linear(fused_dim, hidden_dim),
             nn.ReLU(),
@@ -119,7 +131,9 @@ class CompactPointModel(nn.Module):
         logits = self.classifier(fused)
         params = self.param_head(fused)
         boundary = self.boundary_head(fused).squeeze(-1)
-        instance = F.normalize(self.instance_head(fused), dim=-1)
+        class_context = self.instance_class_proj(F.softmax(logits, dim=-1))
+        instance_input = fused + (self.instance_modulation_scale * class_context)
+        instance = F.normalize(self.instance_head(instance_input), dim=-1)
         return logits, params, boundary, instance
 
 
@@ -165,6 +179,7 @@ def derive_config(candidate_id: str, proposal: dict, diagnosis: dict) -> Science
     hidden_choices = [96, 128, 160]
     global_choices = [128, 192, 256]
     instance_choices = [12, 16, 24]
+    modulation_choices = [0.05, 0.1, 0.15]
     boundary_choices = [0.05, 0.1, 0.15]
     instance_loss_choices = [0.02, 0.05, 0.08]
     neighbor_choices = [6, 8, 10]
@@ -176,6 +191,7 @@ def derive_config(candidate_id: str, proposal: dict, diagnosis: dict) -> Science
         global_dim=global_choices[_deterministic_index(signature + "global", len(global_choices))],
         k_neighbors=neighbor_choices[_deterministic_index(signature + "neighbors", len(neighbor_choices))],
         instance_dim=instance_choices[_deterministic_index(signature + "instance_dim", len(instance_choices))],
+        instance_modulation_scale=modulation_choices[_deterministic_index(signature + "instance_mod", len(modulation_choices))],
         boundary_loss_weight=boundary_choices[_deterministic_index(signature + "boundary", len(boundary_choices))],
         instance_loss_weight=instance_loss_choices[_deterministic_index(signature + "instance_loss", len(instance_loss_choices))],
         time_budget_seconds=budget_choices[_deterministic_index(signature + "budget", len(budget_choices))],
@@ -204,6 +220,7 @@ def derive_config(candidate_id: str, proposal: dict, diagnosis: dict) -> Science
                 **asdict(cfg),
                 "instance_dim": max(cfg.instance_dim, 16),
                 "instance_loss_weight": min(0.1, cfg.instance_loss_weight + 0.02),
+                "instance_modulation_scale": max(cfg.instance_modulation_scale, 0.1),
                 "k_neighbors": max(cfg.k_neighbors, 8),
             }
         )
@@ -321,6 +338,7 @@ def run_science_backend(
         global_dim=cfg.global_dim,
         instance_dim=cfg.instance_dim,
         k_neighbors=cfg.k_neighbors,
+        instance_modulation_scale=cfg.instance_modulation_scale,
     ).to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
 
