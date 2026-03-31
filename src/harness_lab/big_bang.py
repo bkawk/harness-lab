@@ -166,6 +166,27 @@ def render_big_bang_markdown(
     ]
     if not response_lines:
         response_lines = ["- no recent human responses recorded yet"]
+    module_lookup = {
+        str(item.get("module", "")).strip(): item
+        for item in backend_module_summary.get("modules", [])
+        if str(item.get("module", "")).strip()
+    }
+    backend_levers = [
+        ("science_model", "model"),
+        ("science_loss", "loss"),
+        ("science_eval", "eval"),
+        ("science_config", "config"),
+        ("science_train", "train"),
+    ]
+    backend_lever_lines = []
+    target_module = str(mutation_brief.get("target_module", "")).strip()
+    for module_name, label in backend_levers:
+        item = module_lookup.get(module_name, {})
+        focus = "targeted" if module_name == target_module else "available"
+        backend_lever_lines.append(
+            f"- {label}: `{module_name}` ({focus}); attempts `{item.get('attempts', 0)}`, "
+            f"audit_blocked `{item.get('audit_blocked_count', 0)}`, avg_gap `{item.get('avg_transfer_gap', '-')}`"
+        )
     backend_module_lines = []
     for item in backend_module_summary.get("modules", [])[:4]:
         backend_module_lines.append(
@@ -313,6 +334,10 @@ def render_big_bang_markdown(
             "",
             "## Backend Science",
             *backend_science_lines,
+            "### Modular Levers",
+            *backend_lever_lines,
+            "",
+            "### Recent Module Evidence",
             *backend_module_lines,
             "",
             "## External Review",
