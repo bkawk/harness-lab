@@ -6,6 +6,7 @@ from pathlib import Path
 from harness_lab.budget import read_budget
 from harness_lab.datasets import choose_best_prepared_dataset, get_dataset_record
 from harness_lab.diversity import read_diversity
+from harness_lab.external_review import read_external_review
 from harness_lab.hardware import read_hardware_profile
 from harness_lab.hindsight import read_hindsight
 from harness_lab.memory import build_candidate_index, read_json
@@ -298,6 +299,24 @@ def _budget_change_items(budget: dict, mechanism: str) -> tuple[dict, ...]:
     return tuple(items)
 
 
+def _external_review_change_items(review: dict) -> tuple[dict, ...]:
+    if not bool(review.get("review_requested")) and str(review.get("status", "")) != "reviewed":
+        return ()
+    items: list[dict] = []
+    for item in review.get("lab_advice", [])[:3]:
+        summary = str(item.get("summary", "")).strip()
+        kind = str(item.get("kind", "external_review")).strip() or "external_review"
+        if summary:
+            items.append(
+                {
+                    "kind": f"external_review_{kind}",
+                    "mechanism": "external_review",
+                    "summary": summary,
+                }
+            )
+    return tuple(items)
+
+
 def _diversity_change_items(diversity: dict, chosen_mechanism: str, latest_mechanism: str) -> tuple[dict, ...]:
     if not bool(diversity.get("novelty_step_recommended")):
         return ()
@@ -386,6 +405,7 @@ def draft_proposal_for_candidate(
     policy = read_policy(memory_dir)
     budget = read_budget(memory_dir)
     diversity = read_diversity(memory_dir)
+    external_review = read_external_review(memory_dir)
     synthesis = synthesize_parent_candidates(candidates_dir)
     dataset_id = choose_dataset_id(candidates_dir)
     dataset_record = get_dataset_record(memory_dir, dataset_id) if dataset_id else None
@@ -405,6 +425,7 @@ def draft_proposal_for_candidate(
         changes = (
             _policy_change_items(policy, mechanism)
             + _budget_change_items(budget, mechanism)
+            + _external_review_change_items(external_review)
             + _hardware_guardrail_items(hardware_profile)
         )
         if str(policy.get("selection_mode", "")).strip() == "novelty_cycle_priority":
@@ -438,6 +459,7 @@ def draft_proposal_for_candidate(
                 "policy_context": policy,
                 "budget_context": budget,
                 "diversity_context": diversity,
+                "external_review_context": external_review,
                 "branching_mode": "genesis",
             },
         )
@@ -463,6 +485,7 @@ def draft_proposal_for_candidate(
         + _hindsight_change_items(hindsight, mechanism)
         + _policy_change_items(policy, mechanism)
         + _budget_change_items(budget, mechanism)
+        + _external_review_change_items(external_review)
         + _branching_mode_change_items(branching_mode, mechanism, latest_mechanism)
         + _diversity_change_items(diversity, mechanism, latest_mechanism)
         + _hardware_guardrail_items(hardware_profile)
@@ -504,6 +527,13 @@ def draft_proposal_for_candidate(
             "policy_context": policy,
             "budget_context": budget,
             "diversity_context": diversity,
+            "external_review_context": {
+                "status": external_review.get("status", ""),
+                "trigger_reason": external_review.get("trigger_reason", ""),
+                "reviewer": external_review.get("reviewer", ""),
+                "lab_advice": external_review.get("lab_advice", [])[:3],
+                "human_advice": external_review.get("human_advice", [])[:3],
+            },
             "dataset_context": dataset_record or ({"dataset_id": dataset_id, "status": "missing"} if dataset_id else {}),
             "branching_mode": branching_mode,
             "parent_selection": synthesis.get("ranked_parents", [])[:3],

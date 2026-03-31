@@ -5,6 +5,7 @@ from pathlib import Path
 
 from harness_lab.backend import read_backend_profile, write_backend_profile
 from harness_lab.diversity import read_diversity
+from harness_lab.external_review import read_external_review
 from harness_lab.hardware import read_hardware_profile
 from harness_lab.hindsight import read_hindsight
 from harness_lab.memory import read_json, write_candidate_index
@@ -36,6 +37,7 @@ def build_policy(candidates_dir: Path, memory_dir: Path) -> dict:
     diversity = read_diversity(memory_dir)
     hardware = read_hardware_profile(memory_dir)
     backend = read_backend_profile(memory_dir)
+    external_review = read_external_review(memory_dir)
 
     top_outcomes = {str(item.get("label", "")): int(item.get("count", 0)) for item in hindsight.get("top_outcomes", [])}
     top_failure_modes = {str(item.get("label", "")): int(item.get("count", 0)) for item in hindsight.get("top_failure_modes", [])}
@@ -101,6 +103,9 @@ def build_policy(candidates_dir: Path, memory_dir: Path) -> dict:
 
     if policy_adjustments:
         summary = policy_adjustments[0]
+    if str(external_review.get("status", "")) == "reviewed" and external_review.get("lab_advice"):
+        summary = str(external_review.get("situation_summary", summary)) or summary
+        evidence.append("policy:external_review_active")
 
     return {
         "summary": summary,
@@ -117,6 +122,11 @@ def build_policy(candidates_dir: Path, memory_dir: Path) -> dict:
         "candidate_count": int(index.get("candidate_count", 0)),
         "hardware_context": hardware,
         "backend_context": backend,
+        "external_review_context": {
+            "status": external_review.get("status", ""),
+            "trigger_reason": external_review.get("trigger_reason", ""),
+            "reviewer": external_review.get("reviewer", ""),
+        },
         "hindsight_summary": hindsight.get("summary", ""),
         "diversity_summary": diversity.get("summary", ""),
     }

@@ -9,6 +9,7 @@ from pathlib import Path
 from harness_lab.backend import read_backend_profile, write_backend_profile
 from harness_lab.budget import read_budget, write_budget
 from harness_lab.diversity import read_diversity, write_diversity
+from harness_lab.external_review import maybe_request_external_review, read_external_review
 from harness_lab.hindsight import write_hindsight
 from harness_lab.memory import build_candidate_index
 from harness_lab.orchestrator import GENESIS_CANDIDATE_ID, LabStepResult, run_lab_step
@@ -89,6 +90,7 @@ def render_big_bang_markdown(
     budget = {}
     diversity = {}
     backend = {}
+    external_review = {}
     science_summary = {}
     if candidates_dir.exists():
         write_hindsight(candidates_dir, hindsight_path)
@@ -110,8 +112,23 @@ def render_big_bang_markdown(
         diversity = json.loads(diversity_path.read_text(encoding="utf-8"))
     if backend_path.exists():
         backend = json.loads(backend_path.read_text(encoding="utf-8"))
+    external_review = read_external_review(memory_dir)
     if science_summary_path.exists():
         science_summary = json.loads(science_summary_path.read_text(encoding="utf-8"))
+    external_lab_lines = [
+        f"- lab advice: `{str(item.get('summary', '')).strip()}`"
+        for item in external_review.get("lab_advice", [])[:3]
+        if str(item.get("summary", "")).strip()
+    ]
+    if not external_lab_lines:
+        external_lab_lines = ["- lab advice: `No live external advice.`"]
+    external_human_lines = [
+        f"- human advice: `{str(item.get('summary', '')).strip()}`"
+        for item in external_review.get("human_advice", [])[:2]
+        if str(item.get("summary", "")).strip()
+    ]
+    if not external_human_lines:
+        external_human_lines = ["- human advice: `No human-facing advice.`"]
 
     recent = list(index.get("candidates", []))[-5:]
     recent_lines = []
@@ -230,6 +247,14 @@ def render_big_bang_markdown(
             f"- available_backends: `{', '.join(backend.get('available_backends', [])) or '-'}`",
             f"- command_backend_configured: `{backend.get('command_backend_configured', False)}`",
             "",
+            "## External Review",
+            f"- status: `{external_review.get('status', 'idle')}`",
+            f"- trigger_reason: `{external_review.get('trigger_reason', '') or '-'}`",
+            f"- reviewer: `{external_review.get('reviewer', 'none')}`",
+            f"- summary: `{external_review.get('situation_summary', 'No external review yet.')}`",
+            *external_lab_lines,
+            *external_human_lines,
+            "",
             "## Diversity",
             f"- summary: `{diversity.get('summary', 'No diversity yet.')}`",
             f"- current_mechanism_streak: `{diversity.get('current_mechanism_streak', '-')}`",
@@ -312,6 +337,7 @@ def run_big_bang(
             completed += 1
             if cycle_mode == "novelty_cycle":
                 novelty_cycles_triggered += 1
+            review = maybe_request_external_review(candidates_dir, memory_dir)
             update_big_bang_state(
                 memory_dir,
                 status="running",
@@ -325,6 +351,8 @@ def run_big_bang(
                 last_publish_message=latest_result.publish_message,
                 last_cycle_mode=cycle_mode,
                 novelty_cycles_triggered=novelty_cycles_triggered,
+                last_external_review_status=review.get("status", ""),
+                last_external_review_reason=review.get("trigger_reason", ""),
             )
             render_big_bang_markdown(repo_dir, candidates_dir, memory_dir, latest_result)
             policy = read_policy(memory_dir)

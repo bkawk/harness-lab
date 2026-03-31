@@ -13,6 +13,7 @@ This repo is meant to feel alive:
 - the lab can notice the machine it is running on and adapt its assumptions
 - the lab can look back over its own evolutions and write explicit hindsight
 - the lab can let hindsight change what it tries next
+- the lab can decide when it needs bounded outside perspective and split that into `lab_advice` and `human_advice`
 - the lab can derive an explicit policy state from hindsight and hardware
 - the lab can enforce simple exploration budgets across mechanisms
 - the lab can watch recent branch diversity and inject novelty steps when it gets repetitive
@@ -63,6 +64,7 @@ Right now `harness-lab` can:
 - write a hindsight artifact about what it should have done differently
 - use hindsight to influence parent ranking and next-step proposals
 - derive a policy state that changes cooldowns, backend preference, and publish cadence
+- trigger bounded external review with hard gates and cooldowns
 - enforce follow-up budgets so exhausted mechanisms stop dominating the search
 - let budget force a broader branch when the current line has had enough chances
 - let short-term diversity trigger novelty steps before the search feels stale
@@ -100,6 +102,7 @@ Right now `harness-lab` can:
 - `docs/budget.md`
 - `docs/diversity.md`
 - `docs/backend_science_plan.md`
+- `docs/external_review.md`
 
 ## Quick Start
 
@@ -125,6 +128,12 @@ Build the current lab policy with:
 
 ```bash
 PYTHONPATH=src python3 scripts/build_policy.py
+```
+
+Build the current bounded external review artifact with:
+
+```bash
+PYTHONPATH=src python3 scripts/build_external_review.py
 ```
 
 Build the current diversity artifact with:
