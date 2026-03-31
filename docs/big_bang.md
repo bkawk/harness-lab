@@ -5,11 +5,11 @@ The GitHub repo is the lab dashboard.
 ## State
 - status: `running`
 - vital_spark_at: `2026-03-31T10:12:12+00:00`
-- started_at: `2026-03-31T14:46:46+00:00`
-- last_heartbeat: `2026-03-31T14:51:15+00:00`
+- started_at: `2026-03-31T14:53:41+00:00`
+- last_heartbeat: `2026-03-31T14:55:24+00:00`
 - cycles_completed: `1`
 - genesis seed: `cand_0001`
-- last candidate: `cand_0033`
+- last candidate: `cand_0035`
 - last dataset: `abc_boundary512`
 - last commit: `-`
 - last publish message: `Publishing skipped.`
@@ -17,13 +17,13 @@ The GitHub repo is the lab dashboard.
 - novelty cycles triggered: `0`
 
 ## Latest Step
-- candidate: `cand_0033`
+- candidate: `cand_0035`
 - dataset: `abc_boundary512` via `reused_prepared_dataset`
 - seed action: `existing`
 - proposal status: `candidate`
 - outcome status: `complete`
 - diagnosis status: `complete`
-- next top parent: `cand_0013`
+- next top parent: `cand_0003`
 - published: `False`
 - commit: `-`
 - cycle mode: `normal_cycle`
@@ -37,11 +37,11 @@ The GitHub repo is the lab dashboard.
 - backend_poll_interval_seconds: `-`
 
 ## Recent Candidates
+- `cand_0035`: outcome `stalled`; diagnosis `complete`; benchmark `None`
+- `cand_0034`: outcome `stalled`; diagnosis `complete`; benchmark `None`
 - `cand_0033`: outcome `stalled`; diagnosis `complete`; benchmark `None`
 - `cand_0032`: outcome `-`; diagnosis `empty`; benchmark `None`
 - `cand_0031`: outcome `-`; diagnosis `empty`; benchmark `None`
-- `cand_0030`: outcome `stalled`; diagnosis `complete`; benchmark `None`
-- `cand_0029`: outcome `-`; diagnosis `empty`; benchmark `None`
 
 ## Science Leaders
 - best benchmark: `cand_0013` -> `0.3847249926656351`
@@ -57,13 +57,11 @@ The GitHub repo is the lab dashboard.
 - no scored candidates yet
 
 ## Hindsight
-- summary: `Across 32 candidates the lab produced 7 keepers and 1 improved, but 6 audit-blocked outcomes and 3 stalls reveal two systemic gaps: transfer-stability checks arrive too late, and broad multi-fingerprint changes (cand_0031–0033) stall before producing signal. The dominant failure mode is transfer_collapse (3), followed by stale_process (2) and transfer_regression (2). Recent candidates (cand_0027–0029) lack outcome labels entirely, suggesting incomplete evaluation or silent failures in the pipeline.`
-- adjustment: `Run a transfer-stability smoke check before full audit; reject candidates showing transfer_collapse or transfer_regression signals at the smoke-gate stage.`
-- adjustment: `Cap simultaneous backend fingerprint changes at 3 per candidate; cand_0031–0033 show that 6-fingerprint changes stall without yielding evaluable outcomes.`
-- adjustment: `After a loss_recipe_changed stall, require the next candidate using that mechanism to include an explicit stability patch before re-entry (prevents the cand_0026 → cand_0030 repeat).`
+- summary: `The lab saw 6 audit-blocked outcomes; it should have emphasized transfer-stability checks earlier.`
+- adjustment: `Raise priority for proposals that directly target transfer stability after an audit_blocked result.`
 
 ## Policy
-- summary: `Run a transfer-stability smoke check before full audit; reject candidates showing transfer_collapse or transfer_regression signals at the smoke-gate stage.`
+- summary: `Raise priority for proposals that directly target transfer stability after an audit_blocked result.`
 - selection_mode: `stabilize`
 - cooldown_multiplier: `2.0`
 - preferred_runner_backend: `command`
@@ -96,6 +94,6 @@ The GitHub repo is the lab dashboard.
 - [7] `dataset`: `Consider improving the validation split or transfer-oriented data slices so the lab can distinguish local wins from robust gains sooner.`
 
 ## Diversity
-- summary: `Recent branching still has room, but `outcome_classifier_changed` is the current active line.`
-- current_mechanism_streak: `1`
+- summary: `Recent branching still has room, but `initial_harness` is the current active line.`
+- current_mechanism_streak: `2`
 - novelty_step_recommended: `False`
