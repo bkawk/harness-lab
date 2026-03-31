@@ -11,7 +11,10 @@ from harness_lab.science_backend import (
 def test_smoke_gate_allows_full_audit_for_stable_transfer():
     cfg = ScienceConfig()
     benchmark = {"val_score": 0.31, "boundary_f1": 0.24}
-    smoke = {"val_score": 0.295, "boundary_f1": 0.22}
+    smoke = {
+        "transfer_smoke": {"val_score": 0.295, "boundary_f1": 0.22},
+        "boundary_smoke": {"val_score": 0.29, "boundary_f1": 0.2},
+    }
     allowed, reasons = should_run_full_audit(benchmark, smoke, cfg)
     assert allowed is True
     assert reasons == []
@@ -20,18 +23,33 @@ def test_smoke_gate_allows_full_audit_for_stable_transfer():
 def test_smoke_gate_blocks_full_audit_for_transfer_collapse():
     cfg = ScienceConfig()
     benchmark = {"val_score": 0.31, "boundary_f1": 0.24}
-    smoke = {"val_score": 0.25, "boundary_f1": 0.2}
+    smoke = {
+        "transfer_smoke": {"val_score": 0.25, "boundary_f1": 0.2},
+        "boundary_smoke": {"val_score": 0.29, "boundary_f1": 0.2},
+    }
     allowed, reasons = should_run_full_audit(benchmark, smoke, cfg)
     assert allowed is False
-    assert "smoke_transfer_gap_too_wide" in reasons
+    assert "transfer_smoke:gap_too_wide" in reasons
+
+
+def test_smoke_gate_blocks_boundary_specific_collapse():
+    cfg = ScienceConfig()
+    benchmark = {"val_score": 0.31, "boundary_f1": 0.24}
+    smoke = {
+        "transfer_smoke": {"val_score": 0.30, "boundary_f1": 0.2},
+        "boundary_smoke": {"val_score": 0.29, "boundary_f1": 0.08},
+    }
+    allowed, reasons = should_run_full_audit(benchmark, smoke, cfg)
+    assert allowed is False
+    assert "boundary_smoke:boundary_f1_too_low" in reasons
 
 
 def test_smoke_block_classifies_promising_candidate_as_audit_blocked():
     outcome_label, failure_modes = classify_smoke_block(
         {"val_score": 0.28, "boundary_f1": 0.22},
-        {"val_score": 0.22, "boundary_f1": 0.17},
+        {"transfer_smoke": {"val_score": 0.22, "boundary_f1": 0.17}},
         12,
-        ["smoke_transfer_gap_too_wide"],
+        ["transfer_smoke:gap_too_wide"],
     )
     assert outcome_label == "audit_blocked"
     assert failure_modes[0] == "transfer_smoke_failed"

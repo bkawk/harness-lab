@@ -125,7 +125,7 @@ def make_eval_splits(dataset_root: Path) -> tuple[Dataset, Dataset]:
     return benchmark, audit
 
 
-def make_transfer_eval_splits(dataset_root: Path) -> tuple[Dataset, Dataset, Dataset]:
+def make_transfer_eval_splits(dataset_root: Path) -> tuple[Dataset, dict[str, Dataset], Dataset]:
     val_dataset = PackedShardDataset(dataset_root, "val")
     metadata = load_metadata(dataset_root)
     eval_slices = metadata.get("eval_slices", {}) if isinstance(metadata, dict) else {}
@@ -139,14 +139,22 @@ def make_transfer_eval_splits(dataset_root: Path) -> tuple[Dataset, Dataset, Dat
             return Subset(val_dataset, indices)
 
         benchmark = _subset("benchmark")
-        smoke = _subset("transfer_smoke")
+        smoke_transfer = _subset("transfer_smoke")
+        smoke_boundary = _subset("audit_boundary")
+        smoke_hard = _subset("audit_transfer")
         audit = _subset("audit")
-        if benchmark is not None and smoke is not None and audit is not None:
-            return benchmark, smoke, audit
+        smoke_slices = {
+            "transfer_smoke": smoke_transfer,
+            "boundary_smoke": smoke_boundary,
+            "hard_transfer_smoke": smoke_hard,
+        }
+        smoke_slices = {name: dataset for name, dataset in smoke_slices.items() if dataset is not None}
+        if benchmark is not None and smoke_transfer is not None and audit is not None:
+            return benchmark, smoke_slices, audit
 
     count = len(val_dataset)
     if count < 3:
-        return val_dataset, val_dataset, val_dataset
+        return val_dataset, {"transfer_smoke": val_dataset}, val_dataset
 
     benchmark_midpoint = max(1, count // 2)
     benchmark = Subset(val_dataset, range(0, benchmark_midpoint))
@@ -162,7 +170,7 @@ def make_transfer_eval_splits(dataset_root: Path) -> tuple[Dataset, Dataset, Dat
         smoke = benchmark
     if len(audit) == 0:
         audit = smoke
-    return benchmark, smoke, audit
+    return benchmark, {"transfer_smoke": smoke, "boundary_smoke": smoke}, audit
 
 
 def move_batch_to_device(batch: dict[str, torch.Tensor], device: torch.device) -> dict[str, torch.Tensor]:

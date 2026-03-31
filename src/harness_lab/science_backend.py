@@ -348,39 +348,40 @@ def classify_outcome(benchmark_metrics: dict[str, float], audit_metrics: dict[st
 
 def should_run_full_audit(
     benchmark_metrics: dict[str, float],
-    smoke_metrics: dict[str, float],
+    smoke_metrics_by_name: dict[str, dict[str, float]],
     cfg: ScienceConfig,
 ) -> tuple[bool, list[str]]:
     reasons: list[str] = []
     benchmark = float(benchmark_metrics["val_score"])
-    smoke = float(smoke_metrics["val_score"])
-    gap = benchmark - smoke
-    boundary_f1 = float(smoke_metrics.get("boundary_f1", 0.0))
-
     if benchmark < cfg.transfer_smoke_min_score:
         reasons.append("benchmark_below_smoke_floor")
-    if smoke < cfg.transfer_smoke_min_score:
-        reasons.append("smoke_score_below_floor")
-    if gap > cfg.transfer_smoke_max_gap:
-        reasons.append("smoke_transfer_gap_too_wide")
-    if boundary_f1 < cfg.transfer_smoke_min_boundary_f1:
-        reasons.append("smoke_boundary_f1_too_low")
+    for smoke_name, smoke_metrics in smoke_metrics_by_name.items():
+        smoke = float(smoke_metrics["val_score"])
+        gap = benchmark - smoke
+        boundary_f1 = float(smoke_metrics.get("boundary_f1", 0.0))
+        if smoke < cfg.transfer_smoke_min_score:
+            reasons.append(f"{smoke_name}:score_below_floor")
+        if gap > cfg.transfer_smoke_max_gap:
+            reasons.append(f"{smoke_name}:gap_too_wide")
+        if boundary_f1 < cfg.transfer_smoke_min_boundary_f1:
+            reasons.append(f"{smoke_name}:boundary_f1_too_low")
     return (len(reasons) == 0, reasons)
 
 
 def classify_smoke_block(
     benchmark_metrics: dict[str, float],
-    smoke_metrics: dict[str, float],
+    smoke_metrics_by_name: dict[str, dict[str, float]],
     steps: int,
     smoke_failure_reasons: list[str],
 ) -> tuple[str, list[str]]:
     if steps < 2:
         return "train_error", ["undertrained"]
     benchmark = float(benchmark_metrics["val_score"])
-    smoke = float(smoke_metrics["val_score"])
+    primary_smoke = smoke_metrics_by_name.get("transfer_smoke") or next(iter(smoke_metrics_by_name.values()))
+    smoke = float(primary_smoke["val_score"])
     if benchmark >= 0.24:
         return "audit_blocked", ["transfer_smoke_failed", *smoke_failure_reasons]
-    if float(smoke_metrics.get("boundary_f1", 0.0)) < 0.15:
+    if any(float(metrics.get("boundary_f1", 0.0)) < 0.15 for metrics in smoke_metrics_by_name.values()):
         return "dead_end", ["weak_boundary_f1", *smoke_failure_reasons]
     if smoke < 0.20:
         return "dead_end", ["smoke_no_gain", *smoke_failure_reasons]
@@ -463,10 +464,13 @@ def run_science_backend(
     )
 
     train_dataset = PackedShardDataset(dataset_root, "train")
-    benchmark_dataset, smoke_dataset, audit_dataset = make_transfer_eval_splits(dataset_root)
+    benchmark_dataset, smoke_datasets, audit_dataset = make_transfer_eval_splits(dataset_root)
     train_loader = make_dataloader(train_dataset, cfg.batch_size, shuffle=True, drop_last=True)
     benchmark_loader = make_dataloader(benchmark_dataset, cfg.eval_batch_size, shuffle=False)
-    smoke_loader = make_dataloader(smoke_dataset, cfg.eval_batch_size, shuffle=False)
+    smoke_loaders = {
+        name: make_dataloader(dataset, cfg.eval_batch_size, shuffle=False)
+        for name, dataset in smoke_datasets.items()
+    }
     audit_loader = make_dataloader(audit_dataset, cfg.eval_batch_size, shuffle=False)
     write_science_progress(
         trace_dir,
@@ -474,7 +478,8 @@ def run_science_backend(
         candidate_id=candidate_id,
         train_samples=len(train_dataset),
         benchmark_samples=len(benchmark_dataset),
-        smoke_samples=len(smoke_dataset),
+        smoke_samples=sum(len(dataset) for dataset in smoke_datasets.values()),
+        smoke_slice_counts={name: len(dataset) for name, dataset in smoke_datasets.items()},
         audit_samples=len(audit_dataset),
     )
 
@@ -575,16 +580,20 @@ def run_science_backend(
         benchmark_score=round(float(benchmark_metrics["val_score"]), 6),
         benchmark_boundary_f1=round(float(benchmark_metrics.get("boundary_f1", 0.0)), 6),
     )
-    write_science_progress(trace_dir, "smoke_eval_started", candidate_id=candidate_id)
-    smoke_metrics = evaluate_model(model, smoke_loader, device, param_scale=param_scale, num_classes=num_classes)
-    write_science_progress(
-        trace_dir,
-        "smoke_eval_complete",
-        candidate_id=candidate_id,
-        smoke_score=round(float(smoke_metrics["val_score"]), 6),
-        smoke_boundary_f1=round(float(smoke_metrics.get("boundary_f1", 0.0)), 6),
-    )
-    full_audit_completed, smoke_failure_reasons = should_run_full_audit(benchmark_metrics, smoke_metrics, cfg)
+    smoke_metrics_by_name: dict[str, dict[str, float]] = {}
+    for smoke_name, smoke_loader in smoke_loaders.items():
+        write_science_progress(trace_dir, "smoke_eval_started", candidate_id=candidate_id, smoke_name=smoke_name)
+        smoke_metrics_by_name[smoke_name] = evaluate_model(model, smoke_loader, device, param_scale=param_scale, num_classes=num_classes)
+        write_science_progress(
+            trace_dir,
+            "smoke_eval_complete",
+            candidate_id=candidate_id,
+            smoke_name=smoke_name,
+            smoke_score=round(float(smoke_metrics_by_name[smoke_name]["val_score"]), 6),
+            smoke_boundary_f1=round(float(smoke_metrics_by_name[smoke_name].get("boundary_f1", 0.0)), 6),
+        )
+    primary_smoke_metrics = smoke_metrics_by_name.get("transfer_smoke") or next(iter(smoke_metrics_by_name.values()))
+    full_audit_completed, smoke_failure_reasons = should_run_full_audit(benchmark_metrics, smoke_metrics_by_name, cfg)
     if full_audit_completed:
         write_science_progress(trace_dir, "audit_eval_started", candidate_id=candidate_id)
         audit_metrics = evaluate_model(model, audit_loader, device, param_scale=param_scale, num_classes=num_classes)
@@ -597,16 +606,17 @@ def run_science_backend(
         )
         outcome_label, observed_failure_modes = classify_outcome(benchmark_metrics, audit_metrics, steps)
     else:
-        audit_metrics = dict(smoke_metrics)
+        audit_metrics = dict(primary_smoke_metrics)
         audit_metrics["audit_skipped_after_smoke"] = True
         audit_metrics["smoke_failure_reasons"] = list(smoke_failure_reasons)
+        audit_metrics["smoke_metrics_by_name"] = smoke_metrics_by_name
         write_science_progress(
             trace_dir,
             "audit_skipped_after_smoke",
             candidate_id=candidate_id,
             smoke_failure_reasons=",".join(smoke_failure_reasons),
         )
-        outcome_label, observed_failure_modes = classify_smoke_block(benchmark_metrics, smoke_metrics, steps, smoke_failure_reasons)
+        outcome_label, observed_failure_modes = classify_smoke_block(benchmark_metrics, smoke_metrics_by_name, steps, smoke_failure_reasons)
 
     benchmark_summary = (
         f"Real science backend trained {candidate_id} for {training_seconds:.1f}s on {metadata['splits']['train'][0]['path'].split('/')[0] if metadata.get('splits') else 'train'} "
@@ -619,7 +629,7 @@ def run_science_backend(
         )
     else:
         audit_summary = (
-            f"Transfer smoke score was {smoke_metrics['val_score']:.6f}; full audit was skipped after smoke gate "
+            f"Transfer smoke score was {primary_smoke_metrics['val_score']:.6f}; full audit was skipped after smoke gate "
             f"({', '.join(smoke_failure_reasons)})."
         )
     evidence = [
@@ -628,17 +638,17 @@ def run_science_backend(
         f"science:steps:{steps}",
         f"science:train_seconds:{training_seconds:.1f}",
         f"science:benchmark:{benchmark_metrics['val_score']:.6f}",
-        f"science:smoke:{smoke_metrics['val_score']:.6f}",
+        f"science:smoke:{primary_smoke_metrics['val_score']:.6f}",
         f"science:audit:{audit_metrics['val_score']:.6f}",
         f"science:full_audit_completed:{str(full_audit_completed).lower()}",
         f"science:transfer_gap:{(benchmark_metrics['val_score'] - audit_metrics['val_score']):.6f}",
-        f"science:smoke_gap:{(benchmark_metrics['val_score'] - smoke_metrics['val_score']):.6f}",
+        f"science:smoke_gap:{(benchmark_metrics['val_score'] - primary_smoke_metrics['val_score']):.6f}",
         f"science:benchmark_boundary_f1:{benchmark_metrics.get('boundary_f1', 0.0):.6f}",
-        f"science:smoke_boundary_f1:{smoke_metrics.get('boundary_f1', 0.0):.6f}",
+        f"science:smoke_boundary_f1:{primary_smoke_metrics.get('boundary_f1', 0.0):.6f}",
         f"science:audit_boundary_f1:{audit_metrics.get('boundary_f1', 0.0):.6f}",
         f"science:train_samples:{len(train_dataset)}",
         f"science:val_benchmark_samples:{len(benchmark_dataset)}",
-        f"science:val_smoke_samples:{len(smoke_dataset)}",
+        f"science:val_smoke_samples:{sum(len(dataset) for dataset in smoke_datasets.values())}",
         f"science:val_audit_samples:{len(audit_dataset)}",
     ]
 
@@ -647,12 +657,13 @@ def run_science_backend(
         json.dumps(
             {
                 "benchmark_metrics": benchmark_metrics,
-                "smoke_metrics": smoke_metrics,
+                "smoke_metrics": primary_smoke_metrics,
+                "smoke_metrics_by_name": smoke_metrics_by_name,
                 "audit_metrics": audit_metrics,
                 "full_audit_completed": full_audit_completed,
                 "smoke_failure_reasons": smoke_failure_reasons,
                 "benchmark_audit_gap": float(benchmark_metrics["val_score"] - audit_metrics["val_score"]),
-                "benchmark_smoke_gap": float(benchmark_metrics["val_score"] - smoke_metrics["val_score"]),
+                "benchmark_smoke_gap": float(benchmark_metrics["val_score"] - primary_smoke_metrics["val_score"]),
                 "training_seconds": training_seconds,
                 "steps": steps,
                 "peak_vram_mb": peak_vram_mb(device),
@@ -677,7 +688,7 @@ def run_science_backend(
     return ScienceRunResult(
         config=asdict(cfg),
         benchmark_metrics=benchmark_metrics,
-        smoke_metrics=smoke_metrics,
+        smoke_metrics=primary_smoke_metrics,
         audit_metrics=audit_metrics,
         training_seconds=training_seconds,
         steps=steps,

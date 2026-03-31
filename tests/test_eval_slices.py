@@ -74,7 +74,7 @@ def test_make_transfer_eval_splits_prefers_named_slices(tmp_path):
         },
     )
     write_json(shards_dir / "metadata.json", metadata)
-    benchmark, smoke, audit = make_transfer_eval_splits(dataset_root)
+    benchmark, smoke_slices, audit = make_transfer_eval_splits(dataset_root)
     assert len(benchmark) == 2
-    assert len(smoke) == 2
+    assert len(smoke_slices["transfer_smoke"]) == 2
     assert len(audit) == 2
