@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from harness_lab.bootstrap import write_bootstrap_snapshot
 from harness_lab.budget import read_budget
 from harness_lab.datasets import choose_best_prepared_dataset, get_dataset_record
 from harness_lab.diversity import read_diversity
@@ -414,6 +415,14 @@ def draft_proposal_for_candidate(
     candidate_root = _candidate_root(candidates_dir, candidate_id)
     if not candidate_root.exists():
         create_candidate_workspace(candidates_dir, candidate_id, chosen_parent)
+    bootstrap_path = write_bootstrap_snapshot(
+        candidates_dir,
+        memory_dir,
+        candidate_id,
+        parent_id=chosen_parent,
+        dataset_id=dataset_id,
+        synthesis=synthesis,
+    )
 
     if chosen_parent is None:
         mechanism = "initial_harness"
@@ -460,6 +469,7 @@ def draft_proposal_for_candidate(
                 "budget_context": budget,
                 "diversity_context": diversity,
                 "external_review_context": external_review,
+                "bootstrap_snapshot_path": str(bootstrap_path.relative_to(candidate_root)),
                 "branching_mode": "genesis",
             },
         )
@@ -535,6 +545,7 @@ def draft_proposal_for_candidate(
                 "human_advice": external_review.get("human_advice", [])[:3],
             },
             "dataset_context": dataset_record or ({"dataset_id": dataset_id, "status": "missing"} if dataset_id else {}),
+            "bootstrap_snapshot_path": str(bootstrap_path.relative_to(candidate_root)),
             "branching_mode": branching_mode,
             "parent_selection": synthesis.get("ranked_parents", [])[:3],
         },

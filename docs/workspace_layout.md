@@ -20,6 +20,7 @@ artifacts/candidates/<candidate_id>/
   diagnosis/
     summary.json
   memory/
+    bootstrap_snapshot.json
 ```
 
 ## Purpose Of Each Directory
@@ -45,6 +46,7 @@ artifacts/candidates/<candidate_id>/
   - structured failure analysis and counterfactual notes
 - `memory/`
   - links or exports from cross-run synthesis and prior evidence
+  - includes `bootstrap_snapshot.json`, a compact scientific situation report for the candidate
 
 ## Minimal Files
 

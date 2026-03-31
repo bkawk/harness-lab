@@ -10,6 +10,7 @@ This repo is meant to feel alive:
 - every workspace can accumulate diagnosis, plans, outcomes, and memory
 - every workspace now captures harness source provenance and raw runner traces
 - the lab can draft follow-ups from prior evidence
+- every candidate can begin with a bootstrap snapshot of the current scientific situation
 - the lab can notice the machine it is running on and adapt its assumptions
 - the lab can look back over its own evolutions and write explicit hindsight
 - the lab can let hindsight change what it tries next
@@ -51,6 +52,7 @@ Right now `harness-lab` can:
 - build a queryable cross-run memory index
 - capture structured diagnosis
 - draft proposals from diagnosis and memory
+- write a candidate bootstrap snapshot before drafting the next move
 - rank parent candidates explicitly
 - generate execution plans
 - capture harness source snapshots and parent diffs per candidate
@@ -103,6 +105,7 @@ Right now `harness-lab` can:
 - `docs/diversity.md`
 - `docs/backend_science_plan.md`
 - `docs/external_review.md`
+- `docs/bootstrap_snapshot.md`
 
 ## Quick Start
 
@@ -152,6 +155,12 @@ Draft a new proposal from diagnosis memory with:
 
 ```bash
 PYTHONPATH=src python3 scripts/draft_proposal.py cand_0002
+```
+
+Write a candidate bootstrap snapshot from current lab state with:
+
+```bash
+PYTHONPATH=src python3 scripts/build_bootstrap_snapshot.py cand_0002 --dataset-id abc_boundary512
 ```
 
 Rank parent candidates explicitly with:
