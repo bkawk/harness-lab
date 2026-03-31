@@ -37,6 +37,22 @@ def _pick_target_module(memory_dir: Path) -> tuple[str, str]:
     return module_name, f"Recent backend edits are concentrated in `{module_name}`."
 
 
+def _build_problem_statement(top_request: dict, hindsight: dict) -> str:
+    return (
+        str(top_request.get("summary", "")).strip()
+        or str(hindsight.get("summary", "")).strip()
+        or "No dominant mutation target yet."
+    )
+
+
+def _build_module_rationale(module_rationale: str, likely_issue: str) -> str:
+    if not likely_issue:
+        return module_rationale
+    if likely_issue == "vram_headroom":
+        return f"{module_rationale} Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation."
+    return f"{module_rationale} Secondary signal: current science-debug issue is `{likely_issue}`, but it is not the main reason for this recommendation."
+
+
 def build_mutation_brief(candidates_dir: Path, memory_dir: Path) -> dict:
     del candidates_dir
     human_feedback = read_human_feedback(memory_dir)
@@ -51,9 +67,8 @@ def build_mutation_brief(candidates_dir: Path, memory_dir: Path) -> dict:
     top_request = next(iter(human_feedback.get("items", [])), {})
     target_module, module_rationale = _pick_target_module(memory_dir)
     likely_issue = str(science_debug.get("likely_issue", "")).strip()
-    problem_statement = str(top_request.get("summary", "")).strip() or str(hindsight.get("summary", "")).strip() or "No dominant mutation target yet."
-    if likely_issue:
-        problem_statement = f"{problem_statement} Current science-debug issue: {likely_issue}."
+    problem_statement = _build_problem_statement(top_request, hindsight)
+    module_rationale = _build_module_rationale(module_rationale, likely_issue)
 
     supporting_evidence = [str(item) for item in top_request.get("evidence", [])[:5]]
     if not supporting_evidence and science_debug:
@@ -120,22 +135,28 @@ def render_next_change_markdown(repo_dir: Path, memory_dir: Path) -> Path:
     path = next_change_markdown_path(repo_dir)
     brief = read_json(mutation_brief_path(memory_dir)) if mutation_brief_path(memory_dir).exists() else {}
     option_lines = [
-        f"- {'[Recommended]' if item.get('recommended') else '[Option]'} `{item.get('title', '')}`: `{item.get('why', '')}`"
+        f"- {'[Recommended]' if item.get('recommended') else '[Option]'} {item.get('title', '')}: {item.get('why', '')}"
         for item in brief.get("options", [])
-    ] or ["- [Option] `Wait for more data`: `No mutation brief has been generated yet.`"]
+    ] or ["- [Option] Wait for more data: No mutation brief has been generated yet."]
     evidence_lines = [f"- `{item}`" for item in brief.get("supporting_evidence", [])[:6]] or ["- `No supporting evidence recorded yet.`"]
-    guardrail_lines = [f"- `{item}`" for item in brief.get("guardrails", [])[:6]] or ["- `No guardrails recorded yet.`"]
-    verification_lines = [f"- `{item}`" for item in brief.get("verification_plan", [])[:6]] or ["- `No verification plan recorded yet.`"]
+    guardrail_lines = [f"- {item}" for item in brief.get("guardrails", [])[:6]] or ["- No guardrails recorded yet."]
+    verification_lines = [f"- {item}" for item in brief.get("verification_plan", [])[:6]] or ["- No verification plan recorded yet."]
     content = "\n".join(
         [
             "# Next Change",
             "",
-            f"- summary: `{brief.get('summary', 'No mutation brief generated yet.')}`",
+            f"- summary: {brief.get('summary', 'No mutation brief generated yet.')}",
             f"- recommended_action: `{brief.get('recommended_action', 'wait')}`",
             f"- target_module: `{brief.get('target_module', '-') or '-'}`",
             "",
             "## Problem",
-            f"- `{brief.get('problem_statement', 'No problem statement yet.')}`",
+            f"- {brief.get('problem_statement', 'No problem statement yet.')}",
+            "",
+            "## Why This Module",
+            f"- {brief.get('module_rationale', 'No module rationale yet.')}",
+            "",
+            "## Secondary Context",
+            f"- {brief.get('science_debug_summary', 'No secondary science-debug context recorded yet.') or 'No secondary science-debug context recorded yet.'}",
             "",
             "## Options",
             *option_lines,
@@ -150,7 +171,7 @@ def render_next_change_markdown(repo_dir: Path, memory_dir: Path) -> Path:
             *verification_lines,
             "",
             "## Note",
-            "- `This brief is generated for review only. It does not authorize or trigger code changes by itself.`",
+            "- This brief is generated for review only. It does not authorize or trigger code changes by itself.",
         ]
     )
     path.write_text(content + "\n", encoding="utf-8")
