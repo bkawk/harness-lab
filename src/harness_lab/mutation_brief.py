@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 from harness_lab.backend import read_backend_profile
@@ -53,8 +54,46 @@ def _build_module_rationale(module_rationale: str, likely_issue: str) -> str:
     return f"{module_rationale} Secondary signal: current science-debug issue is `{likely_issue}`, but it is not the main reason for this recommendation."
 
 
+def _last_structural_commit(repo_dir: Path) -> str:
+    try:
+        result = subprocess.run(
+            ["git", "log", "--format=%H%x09%s", "-50"],
+            cwd=repo_dir,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except Exception:
+        return ""
+    for line in result.stdout.splitlines():
+        sha, _, subject = line.partition("\t")
+        title = subject.strip()
+        if not sha or not title:
+            continue
+        if title.startswith("big-bang:"):
+            continue
+        return sha.strip()
+    return ""
+
+
+def _scored_candidates_since_commit(memory_dir: Path, commit_sha: str) -> list[dict]:
+    index_path = memory_dir / "candidate_index.json"
+    if not commit_sha or not index_path.exists():
+        return []
+    index = read_json(index_path)
+    items: list[dict] = []
+    for candidate in index.get("candidates", []):
+        benchmark = candidate.get("benchmark_score")
+        audit = candidate.get("audit_score")
+        if benchmark is None and audit is None:
+            continue
+        source_commit = str(candidate.get("source_commit", "")).strip()
+        if source_commit == commit_sha:
+            items.append(candidate)
+    return items
+
+
 def build_mutation_brief(candidates_dir: Path, memory_dir: Path) -> dict:
-    del candidates_dir
     human_feedback = read_human_feedback(memory_dir)
     hindsight = read_hindsight(memory_dir)
     policy = read_policy(memory_dir)
@@ -69,6 +108,22 @@ def build_mutation_brief(candidates_dir: Path, memory_dir: Path) -> dict:
     likely_issue = str(science_debug.get("likely_issue", "")).strip()
     problem_statement = _build_problem_statement(top_request, hindsight)
     module_rationale = _build_module_rationale(module_rationale, likely_issue)
+    repo_dir = memory_dir.parent.parent
+    last_structural_commit = _last_structural_commit(repo_dir)
+    scored_since_change = _scored_candidates_since_commit(memory_dir, last_structural_commit)
+    enough_recent_signal = len(scored_since_change) >= 3
+    scored_since_change_note = (
+        f"{len(scored_since_change)} scored candidate(s) have landed since structural commit `{last_structural_commit[:7]}`."
+        if last_structural_commit
+        else "The last structural change could not be identified, so recent-signal gating is conservative."
+    )
+    if not enough_recent_signal:
+        module_rationale = f"{module_rationale} Hold off on a mutation until the post-change sample is less thin. {scored_since_change_note}"
+    wait_reason = (
+        f"Only {len(scored_since_change)} scored candidate(s) have landed since the last structural change; wait for a slightly larger post-change sample."
+        if last_structural_commit and not enough_recent_signal
+        else "Recent evidence may still be too thin or too noisy; a few more scored candidates could produce a cleaner signal."
+    )
 
     supporting_evidence = [str(item) for item in top_request.get("evidence", [])[:5]]
     if not supporting_evidence and science_debug:
@@ -78,13 +133,21 @@ def build_mutation_brief(candidates_dir: Path, memory_dir: Path) -> dict:
     supporting_evidence = list(dict.fromkeys(supporting_evidence))
 
     return {
-        "summary": f"Current priority is `{str(top_request.get('kind', '') or 'unknown')}` with selection mode `{policy.get('selection_mode', '') or 'unknown'}`.",
-        "recommended_action": "targeted_mutation",
+        "summary": (
+            f"Current priority is `{str(top_request.get('kind', '') or 'unknown')}` with selection mode `{policy.get('selection_mode', '') or 'unknown'}`."
+            if enough_recent_signal
+            else f"Current priority is `{str(top_request.get('kind', '') or 'unknown')}`, but only {len(scored_since_change)} scored candidate(s) have landed since the last structural change."
+        ),
+        "recommended_action": "targeted_mutation" if enough_recent_signal else "wait",
         "target_module": target_module,
         "problem_statement": problem_statement,
         "module_rationale": module_rationale,
         "science_trend_summary": str(science_summary.get("trend_summary", "")).strip(),
-        "science_debug_summary": str(science_debug.get("summary", "")).strip(),
+        "science_debug_summary": (
+            f"{str(science_debug.get('summary', '')).strip()} {scored_since_change_note}".strip()
+            if str(science_debug.get("summary", "")).strip()
+            else scored_since_change_note
+        ),
         "supporting_evidence": supporting_evidence,
         "guardrails": [
             "This brief does not authorize or trigger code changes by itself.",
@@ -104,19 +167,21 @@ def build_mutation_brief(candidates_dir: Path, memory_dir: Path) -> dict:
             "budget_summary": budget.get("summary", ""),
             "backend_summary": backend.get("summary", ""),
             "backend_module_summary": backend_module_summary,
+            "last_structural_commit": last_structural_commit,
+            "scored_candidates_since_change": len(scored_since_change),
         },
         "options": [
             {
                 "kind": "targeted_mutation",
                 "title": f"Mutate {target_module}",
-                "recommended": True,
+                "recommended": enough_recent_signal,
                 "why": module_rationale,
             },
             {
                 "kind": "wait",
                 "title": "Wait for more data",
-                "recommended": False,
-                "why": "Recent evidence may still be too thin or too noisy; a few more scored candidates could produce a cleaner signal.",
+                "recommended": not enough_recent_signal,
+                "why": wait_reason,
             },
         ],
     }
