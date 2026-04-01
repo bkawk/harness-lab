@@ -67,6 +67,63 @@ def update_big_bang_state(memory_dir: Path, **updates: object) -> dict:
     return state
 
 
+def _read_json_file(path: Path) -> dict:
+    if not path.exists():
+        return {}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _has_nested_values(payload: dict) -> bool:
+    return any(isinstance(value, dict) and value for value in payload.values())
+
+
+def _candidate_lookup_order(index: dict, state: dict) -> list[str]:
+    ordered: list[str] = []
+    seen: set[str] = set()
+    for candidate_id in (
+        str(state.get("active_candidate_id", "") or ""),
+        str(state.get("last_candidate_id", "") or ""),
+    ):
+        if candidate_id and candidate_id not in seen:
+            ordered.append(candidate_id)
+            seen.add(candidate_id)
+    for item in reversed(list(index.get("candidates", []))):
+        candidate_id = str(item.get("candidate_id", "") or "")
+        if candidate_id and candidate_id not in seen:
+            ordered.append(candidate_id)
+            seen.add(candidate_id)
+    return ordered
+
+
+def _latest_backend_science_artifacts(candidates_dir: Path, index: dict, state: dict) -> tuple[str, dict, str, dict]:
+    fallback_candidate = str(state.get("active_candidate_id", "") or state.get("last_candidate_id", "") or "")
+    explicit_candidate_id = fallback_candidate
+    explicit_payload: dict = {}
+    effective_candidate_id = fallback_candidate
+    effective_payload: dict = {}
+    for candidate_id in _candidate_lookup_order(index, state):
+        candidate_root = candidates_dir / candidate_id
+        if not explicit_payload:
+            trace_lever_payload = _read_json_file(candidate_root / "traces" / "backend_levers.json")
+            proposal_payload = _read_json_file(candidate_root / "proposal.json").get("backend_levers", {})
+            candidate_explicit = trace_lever_payload if _has_nested_values(trace_lever_payload) else proposal_payload
+            if isinstance(candidate_explicit, dict) and _has_nested_values(candidate_explicit):
+                explicit_candidate_id = candidate_id
+                explicit_payload = candidate_explicit
+        if not effective_payload:
+            candidate_effective = _read_json_file(candidate_root / "traces" / "effective_backend_config.json")
+            if candidate_effective:
+                effective_candidate_id = candidate_id
+                effective_payload = candidate_effective
+        if explicit_payload and effective_payload:
+            break
+    return explicit_candidate_id, explicit_payload, effective_candidate_id, effective_payload
+
+
 def render_big_bang_markdown(
     repo_dir: Path,
     candidates_dir: Path,
@@ -140,20 +197,11 @@ def render_big_bang_markdown(
         live_command_path = candidates_dir / active_candidate_id / "traces" / "live_command.json"
         if live_command_path.exists():
             live_command = json.loads(live_command_path.read_text(encoding="utf-8"))
-    lever_candidate_id = active_candidate_id or str(state.get("last_candidate_id", "") or "")
-    lever_payload = {}
-    effective_lever_payload = {}
-    if lever_candidate_id:
-        candidate_root = candidates_dir / lever_candidate_id
-        trace_lever_path = candidate_root / "traces" / "backend_levers.json"
-        effective_config_path = candidate_root / "traces" / "effective_backend_config.json"
-        proposal_path = candidate_root / "proposal.json"
-        if trace_lever_path.exists():
-            lever_payload = json.loads(trace_lever_path.read_text(encoding="utf-8"))
-        elif proposal_path.exists():
-            lever_payload = json.loads(proposal_path.read_text(encoding="utf-8")).get("backend_levers", {})
-        if effective_config_path.exists():
-            effective_lever_payload = json.loads(effective_config_path.read_text(encoding="utf-8"))
+    explicit_lever_candidate_id, lever_payload, effective_lever_candidate_id, effective_lever_payload = _latest_backend_science_artifacts(
+        candidates_dir,
+        index,
+        state,
+    )
     external_lab_lines = [
         f"- lab advice: `{str(item.get('summary', '')).strip()}`"
         for item in external_review.get("lab_advice", [])[:3]
@@ -220,7 +268,7 @@ def render_big_bang_markdown(
         f"- scored_candidates_since_change: `{mutation_brief.get('context', {}).get('scored_candidates_since_change', '-')}`",
         f"- last_structural_commit: `{str(mutation_brief.get('context', {}).get('last_structural_commit', '') or '-')[:7]}`",
     ]
-    chosen_lever_lines = [f"- source_candidate: `{lever_candidate_id or '-'}`"]
+    chosen_lever_lines = [f"- source_candidate: `{explicit_lever_candidate_id or '-'}`"]
     for module_name, label in backend_levers:
         module_values = lever_payload.get(module_name, {}) if isinstance(lever_payload, dict) else {}
         if isinstance(module_values, dict) and module_values:
@@ -235,7 +283,7 @@ def render_big_bang_markdown(
         "science_config": ("lr", "weight_decay", "time_budget_seconds", "eval_reserve_seconds"),
         "science_train": ("batch_size", "eval_batch_size", "grad_clip", "log_interval"),
     }
-    effective_lever_lines = [f"- source_candidate: `{lever_candidate_id or '-'}`"]
+    effective_lever_lines = [f"- source_candidate: `{effective_lever_candidate_id or '-'}`"]
     for module_name, label in backend_levers:
         field_names = effective_field_groups.get(module_name, ())
         assignments = [

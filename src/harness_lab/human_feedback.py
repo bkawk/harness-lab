@@ -56,8 +56,23 @@ def _quoted_identifier(text: str) -> str:
 RESPONSE_RULES = (
     {
         "kind": "evaluation",
+        "match": "Refine transfer failure attribution",
+        "response_summary": "Refined transfer failure attribution so the lab can tell local-only gains, hard-transfer regressions, and boundary failures apart.",
+    },
+    {
+        "kind": "evaluation",
         "match": "Add transfer smoke gate before full audit",
         "response_summary": "Implemented a transfer-stability smoke gate before full audit.",
+    },
+    {
+        "kind": "module_surface",
+        "match": "Make mutation targeting failure-aware",
+        "response_summary": "Made backend targeting failure-aware so the lab can steer bounded changes toward the right module instead of revisiting a generic basin.",
+    },
+    {
+        "kind": "module_surface",
+        "match": "Enable proposal LLM in big-bang",
+        "response_summary": "Enabled live Claude-authored proposals so module-targeted lever choices can actually be explored in the loop.",
     },
     {
         "kind": "ops",

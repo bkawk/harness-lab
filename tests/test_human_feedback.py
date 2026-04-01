@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from harness_lab.human_feedback import build_human_feedback
+from harness_lab.human_feedback import build_human_feedback, build_human_feedback_responses
 from harness_lab import human_feedback as human_feedback_module
 from harness_lab.workspace import write_json
 
@@ -237,3 +237,29 @@ def test_human_feedback_filters_stale_external_review_failure_advice(tmp_path):
 
     payload = build_human_feedback(memory_dir)
     assert all("science_backend_error" not in item["summary"] for item in payload["items"])
+
+
+def test_human_feedback_responses_recognize_recent_eval_and_module_surface_changes(tmp_path, monkeypatch):
+    memory_dir = tmp_path / "artifacts" / "memory"
+    memory_dir.mkdir(parents=True, exist_ok=True)
+    repo_dir = tmp_path
+    monkeypatch.setattr(
+        human_feedback_module,
+        "_repo_dir_from_memory",
+        lambda path: repo_dir,
+    )
+    monkeypatch.setattr(
+        human_feedback_module,
+        "_git_log",
+        lambda repo_dir, limit=80: [
+            {"commit_sha": "aaaa1111", "subject": "Refine transfer failure attribution"},
+            {"commit_sha": "bbbb2222", "subject": "Make mutation targeting failure-aware"},
+            {"commit_sha": "cccc3333", "subject": "Enable proposal LLM in big-bang"},
+        ],
+    )
+
+    payload = build_human_feedback_responses(memory_dir)
+
+    response_by_kind = {item["kind"]: item for item in payload["responses"]}
+    assert response_by_kind["evaluation"]["commit_sha"] == "aaaa1111"
+    assert response_by_kind["module_surface"]["commit_sha"] == "bbbb2222"
