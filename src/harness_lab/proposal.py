@@ -35,6 +35,8 @@ class DraftProposal:
     target: dict
     changes: tuple[dict, ...]
     backend_levers: dict
+    no_lever_reason: str
+    llm_backend_lever_retry_used: bool
     memory_context: dict
 
     def to_dict(self) -> dict:
@@ -47,6 +49,8 @@ class DraftProposal:
             "target": self.target,
             "changes": list(self.changes),
             "backend_levers": self.backend_levers,
+            "no_lever_reason": self.no_lever_reason,
+            "llm_backend_lever_retry_used": self.llm_backend_lever_retry_used,
             "memory_context": self.memory_context,
         }
 
@@ -636,9 +640,9 @@ def _maybe_llm_author_proposal(
     fallback_changes: tuple[dict, ...],
     fallback_rationale: str,
     fallback_backend_levers: dict,
-) -> tuple[str, dict, tuple[dict, ...], dict]:
+) -> tuple[str, dict, tuple[dict, ...], dict, str, bool]:
     if str(os.environ.get("HARNESS_LAB_LLM_PROPOSAL_ENABLED", "")).strip().lower() not in {"1", "true", "yes"}:
-        return fallback_rationale, fallback_target, fallback_changes, fallback_backend_levers
+        return fallback_rationale, fallback_target, fallback_changes, fallback_backend_levers, "", False
     payload = run_claude_json(
         _llm_proposal_prompt(
             bootstrap_snapshot=bootstrap_snapshot,
@@ -656,10 +660,12 @@ def _maybe_llm_author_proposal(
     normalized = _normalize_llm_proposal_payload(payload or {}, fallback_target, fallback_changes, fallback_rationale)
     if not normalized:
         log.warning("proposal: claude fallback to heuristic (payload=%s)", "empty" if not payload else "invalid")
-        return fallback_rationale, fallback_target, fallback_changes, fallback_backend_levers
+        return fallback_rationale, fallback_target, fallback_changes, fallback_backend_levers, "", False
     rationale, target, changes, backend_levers, no_lever_reason = normalized
     targeted_module = _targeted_module_without_levers(target, backend_levers)
+    retry_used = False
     if targeted_module and not _has_good_no_lever_reason(no_lever_reason):
+        retry_used = True
         retry_payload = run_claude_json(
             _llm_proposal_prompt(
                 bootstrap_snapshot=bootstrap_snapshot,
@@ -681,7 +687,7 @@ def _maybe_llm_author_proposal(
             rationale, target, changes, backend_levers, no_lever_reason = retry_normalized
     backend_levers = _soft_wait_backend_levers(backend_levers, mutation_brief)
     log.info("proposal authored by claude")
-    return rationale, target, changes, backend_levers
+    return rationale, target, changes, backend_levers, no_lever_reason, retry_used
 
 
 def draft_proposal_for_candidate(
@@ -754,7 +760,7 @@ def draft_proposal_for_candidate(
             "expected_failure_mode": "",
             "novelty_basis": "genesis real-backend baseline with no prior candidate lineage",
         }
-        rationale, target, changes, backend_levers = _maybe_llm_author_proposal(
+        rationale, target, changes, backend_levers, no_lever_reason, llm_backend_lever_retry_used = _maybe_llm_author_proposal(
             candidate_root=candidate_root,
             bootstrap_snapshot=bootstrap_snapshot,
             parent_diagnosis={},
@@ -776,6 +782,8 @@ def draft_proposal_for_candidate(
             target=target,
             changes=changes,
             backend_levers=backend_levers,
+            no_lever_reason=no_lever_reason,
+            llm_backend_lever_retry_used=llm_backend_lever_retry_used,
             memory_context={
                 "parent_created_at": "",
                 "reference_candidate_ids": [],
@@ -835,7 +843,7 @@ def draft_proposal_for_candidate(
         "expected_failure_mode": failure_modes[0] if failure_modes else str(parent_summary.get("expected_failure_mode", "")).strip(),
         "novelty_basis": _novelty_basis_from_memory(index, parent_summary, parent_diagnosis),
     }
-    rationale, target, changes, backend_levers = _maybe_llm_author_proposal(
+    rationale, target, changes, backend_levers, no_lever_reason, llm_backend_lever_retry_used = _maybe_llm_author_proposal(
         candidate_root=candidate_root,
         bootstrap_snapshot=bootstrap_snapshot,
         mutation_brief=mutation_brief,
@@ -857,6 +865,8 @@ def draft_proposal_for_candidate(
         target=target,
         changes=changes,
         backend_levers=backend_levers,
+        no_lever_reason=no_lever_reason,
+        llm_backend_lever_retry_used=llm_backend_lever_retry_used,
         memory_context={
             "parent_created_at": str(parent_workspace.get("created_at", "")),
             "reference_candidate_ids": [chosen_parent],

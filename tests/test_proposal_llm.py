@@ -116,6 +116,8 @@ def test_llm_proposal_can_author_draft(tmp_path, monkeypatch):
     assert draft.changes[0]["kind"] == "llm_priority"
     assert draft.backend_levers["science_model"]["hidden_dim"] == 160
     assert draft.backend_levers["science_eval"]["transfer_smoke_max_gap"] == 0.025
+    assert draft.no_lever_reason == ""
+    assert draft.llm_backend_lever_retry_used is False
     assert "backend_lever_catalog" in seen["prompt"]
     assert "returning empty backend_levers is discouraged" in seen["prompt"]
     assert "Good examples" in seen["prompt"]
@@ -200,6 +202,8 @@ def test_wait_gate_allows_small_targeted_lever_nudges(tmp_path, monkeypatch):
     draft = proposal_module.draft_proposal_for_candidate(candidates_dir, 'cand_0002')
 
     assert draft.backend_levers == {'science_model': {'hidden_dim': 160, 'k_neighbors': 10}}
+    assert draft.no_lever_reason == ""
+    assert draft.llm_backend_lever_retry_used is False
 
 
 def test_llm_prompt_suppresses_conflicting_broaden_signals_for_target_module(tmp_path, monkeypatch):
@@ -245,6 +249,8 @@ def test_llm_prompt_suppresses_conflicting_broaden_signals_for_target_module(tmp
     draft = proposal_module.draft_proposal_for_candidate(candidates_dir, "cand_0002")
 
     assert draft.backend_levers == {"science_model": {"hidden_dim": 160}}
+    assert draft.no_lever_reason == ""
+    assert draft.llm_backend_lever_retry_used is False
     assert "force broader exploration" not in seen["prompt"]
     assert "novelty step" not in seen["prompt"]
     assert "science_model" in seen["prompt"]
@@ -297,6 +303,8 @@ def test_llm_retries_when_targeted_module_has_empty_levers_without_reason(tmp_pa
     draft = proposal_module.draft_proposal_for_candidate(candidates_dir, "cand_0002")
 
     assert draft.backend_levers == {"science_model": {"hidden_dim": 160}}
+    assert draft.no_lever_reason == ""
+    assert draft.llm_backend_lever_retry_used is True
     assert len(seen_prompts) == 2
     assert "Do not leave both `backend_levers` and `no_lever_reason` empty." in seen_prompts[-1]
 
@@ -338,4 +346,6 @@ def test_llm_does_not_retry_when_empty_levers_have_good_reason(tmp_path, monkeyp
     draft = proposal_module.draft_proposal_for_candidate(candidates_dir, "cand_0002")
 
     assert draft.backend_levers == {}
+    assert draft.no_lever_reason.startswith("The recent targeted-mutation window is still narrow")
+    assert draft.llm_backend_lever_retry_used is False
     assert len(seen_prompts) == 1
