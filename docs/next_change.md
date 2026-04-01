@@ -1,25 +1,26 @@
 # Next Change
 
-- summary: Current priority is `vram_headroom` with selection mode `stabilize`.
+- summary: Current priority is `non_self_evolving` with selection mode `stabilize`.
 - recommended_action: `targeted_mutation`
 - target_module: `science_loss`
 
 ## Problem
-- Consider increasing batch size or model capacity so the science backend uses more of the available VRAM.
+- Consider strengthening the non-self-evolving seed around `hard_transfer_regression` if that failure mode keeps dominating.
 
 ## Why This Module
 - Recent failures are boundary-transfer specific, so the loss surface is the best next bounded module to adjust. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation.
 
 ## Secondary Context
-- Recent real-backend runs are only using about 639.5 MB on average, leaving most VRAM unused. 4 scored candidate(s) have landed since structural commit `0ab69b5`.
+- Recent real-backend runs are only using about 645.2 MB on average, leaving most VRAM unused. 5 scored candidate(s) have landed since structural commit `0ab69b5`.
 
 ## Options
 - [Recommended] Mutate science_loss: Recent failures are boundary-transfer specific, so the loss surface is the best next bounded module to adjust. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation.
 - [Option] Wait on broad mutation: Recent evidence may still be too thin or too noisy for broad mutation, but conservative lever nudges are still allowed while more scored candidates accumulate.
 
 ## Evidence
-- `artifacts/memory/science_debug_summary.json`
-- `artifacts/memory/hardware_profile.json`
+- `artifacts/memory/candidate_index.json`
+- `artifacts/memory/hindsight.json`
+- `artifacts/memory/policy.json`
 - `artifacts/memory/backend_module_summary.json`
 
 ## Guardrails
