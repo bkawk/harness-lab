@@ -82,6 +82,13 @@ def summarize_candidate(candidate_root: Path) -> CandidateSummary:
     target = proposal.get("target", {})
     failure_modes = tuple(str(item) for item in diagnosis.get("failure_modes", []))
     observed_failure_modes = tuple(str(item) for item in outcome.get("observed_failure_modes", []))
+    expected_failure_mode = ""
+    if failure_modes:
+        expected_failure_mode = failure_modes[0]
+    elif observed_failure_modes:
+        expected_failure_mode = observed_failure_modes[0]
+    else:
+        expected_failure_mode = str(target.get("expected_failure_mode", ""))
     evidence = [str(item) for item in outcome.get("evidence", [])]
     source_manifest = read_json(source_manifest_path) if source_manifest_path.exists() else {}
     patch_summary = read_json(patch_summary_path) if patch_summary_path.exists() else {}
@@ -99,7 +106,7 @@ def summarize_candidate(candidate_root: Path) -> CandidateSummary:
         created_at=str(workspace["created_at"]),
         proposal_status=str(proposal.get("status", "")),
         harness_component=str(target.get("harness_component", "")),
-        expected_failure_mode=str(target.get("expected_failure_mode", "")),
+        expected_failure_mode=expected_failure_mode,
         novelty_basis=str(target.get("novelty_basis", "")),
         diagnosis_status=str(diagnosis.get("status", "")),
         diagnosis_summary=str(diagnosis.get("summary", "")),
