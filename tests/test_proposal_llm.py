@@ -123,6 +123,7 @@ def test_llm_proposal_can_author_draft(tmp_path, monkeypatch):
     assert "Prefer one or two small coordinated lever moves" in seen["prompt"]
     assert "science_train -> {batch_size: 3, eval_batch_size: 3}" in seen["prompt"]
     assert "science_loss -> {boundary_loss_weight: 0.12, instance_margin: 0.38}" in seen["prompt"]
+    assert "strongly prefer science_train or science_model capacity moves over science_loss" in seen["prompt"]
     assert "Good examples" in seen["prompt"]
 
 

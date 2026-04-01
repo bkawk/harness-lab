@@ -28,14 +28,17 @@ def _failure_mode_target(hindsight: dict, top_request: dict) -> tuple[str, str] 
         if str(item.get("label", "")).strip()
     ]
     top_request_kind = str(top_request.get("kind", "")).strip()
+    if top_request_kind == "vram_headroom":
+        return (
+            "science_train",
+            "The top live pressure is unused VRAM headroom, so favor explicit train-capacity moves first. Start with batch_size and eval_batch_size before drifting back to loss tuning.",
+        )
     if any(label in {"boundary_transfer_weak", "boundary_smoke:gap_too_wide", "audit_boundary_f1_weak"} for label in recent_failures):
         return "science_loss", "Recent failures are boundary-transfer specific, so the loss surface is the best next bounded module to adjust."
     if any(label in {"transfer_smoke:gap_too_wide", "transfer_smoke_score_below_floor", "hard_transfer_smoke:gap_too_wide"} for label in recent_failures):
         return "science_eval", "Recent failures are dominated by smoke-gate transfer checks, so the evaluation module is the best next bounded target."
     if any(label in {"transfer_collapse", "transfer_regression", "hard_transfer_regression", "local_only_gain"} for label in recent_failures):
         return "science_model", "Recent failures point to transfer behavior that likely depends on model capacity and representation quality."
-    if top_request_kind == "vram_headroom":
-        return "science_train", "The top live pressure is unused VRAM headroom, so a bounded batch-size move is the best next target before larger architectural jumps."
     return None
 
 
