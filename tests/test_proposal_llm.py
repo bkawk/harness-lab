@@ -84,6 +84,31 @@ def test_llm_proposal_can_author_draft(tmp_path, monkeypatch):
     monkeypatch.setattr(proposal_module, "read_diversity", lambda memory_dir: {"novelty_step_recommended": False})
     monkeypatch.setattr(proposal_module, "read_external_review", lambda memory_dir: {"status": "idle", "review_requested": False})
     monkeypatch.setattr(proposal_module, "synthesize_parent_candidates", lambda candidates_dir: {"top_parent_id": "cand_0001", "ranked_parents": [{"candidate_id": "cand_0001"}]})
+    seen = {}
+
+    def fake_run(prompt, *, cwd):
+        seen["prompt"] = prompt
+        return {
+            "rationale": "Claude wants a tighter transfer-stability follow-up.",
+            "target": {
+                "harness_component": "transfer_guard",
+                "expected_failure_mode": "audit_blocked",
+                "novelty_basis": "test a narrower transfer guard around the parent failure",
+            },
+            "changes": [
+                {
+                    "kind": "llm_priority",
+                    "mechanism": "transfer_guard",
+                    "summary": "Favor a smaller transfer-stability move instead of a broad architecture jump.",
+                }
+            ],
+            "backend_levers": {
+                "science_model": {"hidden_dim": 160, "k_neighbors": 10},
+                "science_eval": {"transfer_smoke_max_gap": 0.025},
+            },
+        }
+
+    monkeypatch.setattr(proposal_module, "run_claude_json", fake_run)
 
     draft = proposal_module.draft_proposal_for_candidate(candidates_dir, "cand_0002")
     assert draft.rationale == "Claude wants a tighter transfer-stability follow-up."
@@ -91,6 +116,7 @@ def test_llm_proposal_can_author_draft(tmp_path, monkeypatch):
     assert draft.changes[0]["kind"] == "llm_priority"
     assert draft.backend_levers["science_model"]["hidden_dim"] == 160
     assert draft.backend_levers["science_eval"]["transfer_smoke_max_gap"] == 0.025
+    assert "backend_lever_catalog" in seen["prompt"]
 
 
 def test_invalid_llm_proposal_falls_back_to_heuristic(tmp_path, monkeypatch):

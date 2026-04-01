@@ -14,6 +14,41 @@ from harness_lab.policy import read_policy
 from harness_lab.workspace import write_json
 
 
+def _backend_lever_catalog() -> dict:
+    return {
+        "science_model": {
+            "hidden_dim": {"min": 64, "max": 192},
+            "global_dim": {"min": 96, "max": 320},
+            "instance_dim": {"min": 8, "max": 32},
+            "k_neighbors": {"min": 4, "max": 16},
+            "instance_modulation_scale": {"min": 0.0, "max": 0.25},
+        },
+        "science_loss": {
+            "param_loss_weight": {"min": 0.05, "max": 0.5},
+            "boundary_loss_weight": {"min": 0.01, "max": 0.3},
+            "instance_loss_weight": {"min": 0.0, "max": 0.15},
+            "instance_margin": {"min": 0.1, "max": 0.6},
+        },
+        "science_eval": {
+            "transfer_smoke_min_score": {"min": 0.15, "max": 0.35},
+            "transfer_smoke_max_gap": {"min": 0.01, "max": 0.08},
+            "transfer_smoke_min_boundary_f1": {"min": 0.05, "max": 0.25},
+        },
+        "science_config": {
+            "lr": {"min": 1e-4, "max": 6e-4},
+            "weight_decay": {"min": 1e-5, "max": 5e-4},
+            "time_budget_seconds": {"min": 300, "max": 900},
+            "eval_reserve_seconds": {"min": 60, "max": 240},
+        },
+        "science_train": {
+            "batch_size": {"min": 1, "max": 4},
+            "eval_batch_size": {"min": 1, "max": 4},
+            "grad_clip": {"min": 0.5, "max": 2.0},
+            "log_interval": {"min": 5, "max": 100},
+        },
+    }
+
+
 def bootstrap_snapshot_path(candidates_dir: Path, candidate_id: str) -> Path:
     return candidates_dir / candidate_id / "memory" / "bootstrap_snapshot.json"
 
@@ -122,6 +157,7 @@ def build_decision_bundle(
         "science_summary": science_summary,
         "science_debug_summary": science_debug_summary,
         "backend_module_summary": backend_module_summary,
+        "backend_lever_catalog": _backend_lever_catalog(),
         "leaders": science_summary.get("leaders", {}),
         "recent_scored_candidates": finished_scored[-5:],
         "pending_candidates": pending_candidates[-8:],
@@ -246,6 +282,7 @@ def build_bootstrap_snapshot(
             "summary": backend_module_summary.get("summary", ""),
             "modules": backend_module_summary.get("modules", [])[:4],
         },
+        "backend_lever_catalog": _backend_lever_catalog(),
         "hindsight_summary": hindsight.get("summary", ""),
         "policy_summary": policy.get("summary", ""),
         "budget_summary": budget.get("summary", ""),
