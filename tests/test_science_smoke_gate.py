@@ -52,7 +52,21 @@ def test_smoke_block_classifies_promising_candidate_as_audit_blocked():
         ["transfer_smoke:gap_too_wide"],
     )
     assert outcome_label == "audit_blocked"
-    assert failure_modes[0] == "transfer_smoke_failed"
+    assert failure_modes[0] == "transfer_smoke_gap_too_wide"
+
+
+def test_smoke_block_surfaces_boundary_specific_primary_failure():
+    outcome_label, failure_modes = classify_smoke_block(
+        {"val_score": 0.31, "boundary_f1": 0.24},
+        {
+            "transfer_smoke": {"val_score": 0.30, "boundary_f1": 0.2},
+            "boundary_smoke": {"val_score": 0.29, "boundary_f1": 0.08},
+        },
+        12,
+        ["boundary_smoke:boundary_f1_too_low"],
+    )
+    assert outcome_label == "audit_blocked"
+    assert failure_modes[0] == "boundary_transfer_weak"
 
 
 def test_derive_config_supports_eval_reserve_override(monkeypatch):

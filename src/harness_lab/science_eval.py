@@ -6,11 +6,32 @@ if TYPE_CHECKING:
     from harness_lab.science_config import ScienceConfig
 
 
+def _append_unique(items: list[str], value: str) -> None:
+    if value and value not in items:
+        items.append(value)
+
+
+def _smoke_primary_failure(smoke_failure_reasons: list[str]) -> str:
+    if any(reason.startswith("boundary_smoke:boundary_f1_too_low") for reason in smoke_failure_reasons):
+        return "boundary_transfer_weak"
+    if any(reason.startswith("hard_transfer_smoke:gap_too_wide") for reason in smoke_failure_reasons):
+        return "hard_transfer_regression"
+    if any(reason.startswith("boundary_smoke:gap_too_wide") for reason in smoke_failure_reasons):
+        return "boundary_transfer_regression"
+    if any(reason.startswith("transfer_smoke:gap_too_wide") for reason in smoke_failure_reasons):
+        return "transfer_smoke_gap_too_wide"
+    if any(reason.endswith(":score_below_floor") for reason in smoke_failure_reasons):
+        return "transfer_smoke_score_below_floor"
+    return "transfer_smoke_failed"
+
+
 def classify_outcome(benchmark_metrics: dict[str, float], audit_metrics: dict[str, float], steps: int) -> tuple[str, list[str]]:
     benchmark = float(benchmark_metrics["val_score"])
     audit = float(audit_metrics["val_score"])
     gap = benchmark - audit
-    boundary_f1 = float(audit_metrics.get("boundary_f1", benchmark_metrics.get("boundary_f1", 0.0)))
+    benchmark_boundary_f1 = float(benchmark_metrics.get("boundary_f1", 0.0))
+    audit_boundary_f1 = float(audit_metrics.get("boundary_f1", benchmark_boundary_f1))
+    boundary_gap = benchmark_boundary_f1 - audit_boundary_f1
     if steps < 2:
         return "train_error", ["undertrained"]
     if benchmark >= 0.30 and audit >= benchmark - 0.025:
@@ -18,13 +39,22 @@ def classify_outcome(benchmark_metrics: dict[str, float], audit_metrics: dict[st
     if audit >= 0.28 and audit >= benchmark + 0.01:
         return "improved", ["transfer_win"]
     if benchmark >= 0.24:
+        reasons: list[str] = []
         if gap > 0.04:
-            return "audit_blocked", ["transfer_collapse"]
-        if gap > 0.02:
-            return "audit_blocked", ["transfer_regression"]
-        return "audit_blocked", ["local_only_gain"]
-    if boundary_f1 < 0.15:
-        return "dead_end", ["weak_boundary_f1"]
+            _append_unique(reasons, "transfer_collapse")
+        elif gap > 0.02:
+            _append_unique(reasons, "transfer_regression")
+        else:
+            _append_unique(reasons, "local_only_gain")
+        if audit < 0.28:
+            _append_unique(reasons, "audit_score_below_keeper_band")
+        if boundary_gap > 0.05:
+            _append_unique(reasons, "boundary_transfer_regression")
+        if audit_boundary_f1 < 0.28:
+            _append_unique(reasons, "audit_boundary_f1_weak")
+        return "audit_blocked", reasons
+    if audit_boundary_f1 < 0.15:
+        return "dead_end", ["weak_boundary_f1", "audit_boundary_f1_weak"]
     return "dead_end", ["no_gain"]
 
 
@@ -61,10 +91,11 @@ def classify_smoke_block(
     benchmark = float(benchmark_metrics["val_score"])
     primary_smoke = smoke_metrics_by_name.get("transfer_smoke") or next(iter(smoke_metrics_by_name.values()))
     smoke = float(primary_smoke["val_score"])
+    primary_failure = _smoke_primary_failure(smoke_failure_reasons)
     if benchmark >= 0.24:
-        return "audit_blocked", ["transfer_smoke_failed", *smoke_failure_reasons]
+        return "audit_blocked", [primary_failure, *smoke_failure_reasons]
     if any(float(metrics.get("boundary_f1", 0.0)) < 0.15 for metrics in smoke_metrics_by_name.values()):
-        return "dead_end", ["weak_boundary_f1", *smoke_failure_reasons]
+        return "dead_end", ["weak_boundary_f1", primary_failure, *smoke_failure_reasons]
     if smoke < 0.20:
-        return "dead_end", ["smoke_no_gain", *smoke_failure_reasons]
-    return "audit_blocked", ["transfer_smoke_failed", *smoke_failure_reasons]
+        return "dead_end", ["smoke_no_gain", primary_failure, *smoke_failure_reasons]
+    return "audit_blocked", [primary_failure, *smoke_failure_reasons]

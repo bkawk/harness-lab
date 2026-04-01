@@ -236,6 +236,9 @@ def run_training_cycle(
         f"science:val_smoke_samples:{sum(len(dataset) for dataset in smoke_datasets.values())}",
         f"science:val_audit_samples:{len(audit_dataset)}",
     ]
+    if observed_failure_modes:
+        evidence.append(f"science:primary_failure_mode:{observed_failure_modes[0]}")
+        evidence.extend(f"science:failure_mode:{mode}" for mode in observed_failure_modes[1:4])
 
     (trace_dir / "science_config.json").write_text(json.dumps(asdict(cfg), indent=2, sort_keys=True) + "\n", encoding="utf-8")
     (trace_dir / "science_metrics.json").write_text(
@@ -254,6 +257,7 @@ def run_training_cycle(
                 "peak_vram_mb": peak_vram_mb(device),
                 "device": device.type,
                 "last_train_stats": last_stats,
+                "observed_failure_modes": observed_failure_modes,
             },
             indent=2,
             sort_keys=True,
