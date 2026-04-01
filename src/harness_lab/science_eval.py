@@ -25,6 +25,35 @@ def _smoke_primary_failure(smoke_failure_reasons: list[str]) -> str:
     return "transfer_smoke_failed"
 
 
+def _count_smoke_gap_failures(smoke_failure_reasons: list[str]) -> int:
+    return sum(1 for reason in smoke_failure_reasons if reason.endswith(":gap_too_wide"))
+
+
+def _should_hard_fail_after_smoke(
+    benchmark_metrics: dict[str, float],
+    smoke_metrics_by_name: dict[str, dict[str, float]],
+    smoke_failure_reasons: list[str],
+) -> bool:
+    benchmark = float(benchmark_metrics["val_score"])
+    primary_smoke = smoke_metrics_by_name.get("transfer_smoke") or next(iter(smoke_metrics_by_name.values()))
+    smoke = float(primary_smoke["val_score"])
+    gap = benchmark - smoke
+    boundary_metrics = smoke_metrics_by_name.get("boundary_smoke", {})
+    boundary_f1 = float(boundary_metrics.get("boundary_f1", 1.0))
+
+    if "hard_transfer_smoke:gap_too_wide" in smoke_failure_reasons:
+        return True
+    if "boundary_smoke:gap_too_wide" in smoke_failure_reasons and (
+        "boundary_smoke:boundary_f1_too_low" in smoke_failure_reasons or boundary_f1 < 0.15
+    ):
+        return True
+    if _count_smoke_gap_failures(smoke_failure_reasons) >= 2:
+        return True
+    if gap >= 0.07:
+        return True
+    return False
+
+
 def classify_outcome(benchmark_metrics: dict[str, float], audit_metrics: dict[str, float], steps: int) -> tuple[str, list[str]]:
     benchmark = float(benchmark_metrics["val_score"])
     audit = float(audit_metrics["val_score"])
@@ -92,7 +121,14 @@ def classify_smoke_block(
     primary_smoke = smoke_metrics_by_name.get("transfer_smoke") or next(iter(smoke_metrics_by_name.values()))
     smoke = float(primary_smoke["val_score"])
     primary_failure = _smoke_primary_failure(smoke_failure_reasons)
+    severe_smoke_failure = _should_hard_fail_after_smoke(
+        benchmark_metrics,
+        smoke_metrics_by_name,
+        smoke_failure_reasons,
+    )
     if benchmark >= 0.24:
+        if severe_smoke_failure:
+            return "dead_end", [primary_failure, *smoke_failure_reasons]
         return "audit_blocked", [primary_failure, *smoke_failure_reasons]
     if any(float(metrics.get("boundary_f1", 0.0)) < 0.15 for metrics in smoke_metrics_by_name.values()):
         return "dead_end", ["weak_boundary_f1", primary_failure, *smoke_failure_reasons]

@@ -69,6 +69,34 @@ def test_smoke_block_surfaces_boundary_specific_primary_failure():
     assert failure_modes[0] == "boundary_transfer_weak"
 
 
+def test_smoke_block_marks_severe_boundary_transfer_as_dead_end():
+    outcome_label, failure_modes = classify_smoke_block(
+        {"val_score": 0.31, "boundary_f1": 0.24},
+        {
+            "transfer_smoke": {"val_score": 0.29, "boundary_f1": 0.19},
+            "boundary_smoke": {"val_score": 0.22, "boundary_f1": 0.08},
+        },
+        12,
+        ["boundary_smoke:gap_too_wide", "boundary_smoke:boundary_f1_too_low"],
+    )
+    assert outcome_label == "dead_end"
+    assert failure_modes[0] == "boundary_transfer_weak"
+
+
+def test_smoke_block_marks_multi_slice_gap_failures_as_dead_end():
+    outcome_label, failure_modes = classify_smoke_block(
+        {"val_score": 0.32, "boundary_f1": 0.24},
+        {
+            "transfer_smoke": {"val_score": 0.25, "boundary_f1": 0.2},
+            "hard_transfer_smoke": {"val_score": 0.24, "boundary_f1": 0.19},
+        },
+        12,
+        ["transfer_smoke:gap_too_wide", "hard_transfer_smoke:gap_too_wide"],
+    )
+    assert outcome_label == "dead_end"
+    assert failure_modes[0] == "hard_transfer_regression"
+
+
 def test_derive_config_supports_eval_reserve_override(monkeypatch):
     monkeypatch.setenv("HARNESS_LAB_SCIENCE_TIME_BUDGET_SECONDS", "600")
     monkeypatch.setenv("HARNESS_LAB_SCIENCE_EVAL_RESERVE_SECONDS", "120")
