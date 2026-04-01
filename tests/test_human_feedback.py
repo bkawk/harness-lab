@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from harness_lab.human_feedback import build_human_feedback, build_human_feedback_responses
+from harness_lab.human_feedback import (
+    build_human_feedback,
+    build_human_feedback_responses,
+    read_manual_human_feedback_responses,
+    write_manual_human_feedback_response_template,
+)
 from harness_lab import human_feedback as human_feedback_module
 from harness_lab.workspace import write_json
 
@@ -263,3 +268,72 @@ def test_human_feedback_responses_recognize_recent_eval_and_module_surface_chang
     response_by_kind = {item["kind"]: item for item in payload["responses"]}
     assert response_by_kind["evaluation"]["commit_sha"] == "aaaa1111"
     assert response_by_kind["module_surface"]["commit_sha"] == "bbbb2222"
+
+
+def test_manual_human_feedback_responses_override_commit_inference(tmp_path, monkeypatch):
+    repo_dir = tmp_path
+    memory_dir = repo_dir / "artifacts" / "memory"
+    docs_dir = repo_dir / "docs"
+    memory_dir.mkdir(parents=True, exist_ok=True)
+    docs_dir.mkdir(parents=True, exist_ok=True)
+    write_json(
+        docs_dir / "lab_responses.json",
+        {
+            "responses": [
+                {
+                    "kind": "evaluation",
+                    "status": "planned",
+                    "human_response": "We are watching the new failure reasons for a few more scored candidates.",
+                    "next_action": "Tighten boundary smoke only if hard-transfer regressions keep leading.",
+                    "updated_at": "2026-04-01T20:00:00+00:00",
+                }
+            ]
+        },
+    )
+    monkeypatch.setattr(
+        human_feedback_module,
+        "_repo_dir_from_memory",
+        lambda path: repo_dir,
+    )
+    monkeypatch.setattr(
+        human_feedback_module,
+        "_git_log",
+        lambda repo_dir, limit=80: [
+            {"commit_sha": "aaaa1111", "subject": "Refine transfer failure attribution"},
+        ],
+    )
+
+    payload = build_human_feedback_responses(memory_dir)
+
+    assert payload["responses"][0]["kind"] == "evaluation"
+    assert payload["responses"][0]["response_source"] == "manual"
+    assert payload["responses"][0]["commit_sha"] == ""
+    assert "Next:" in payload["responses"][0]["response_summary"]
+
+
+def test_manual_human_feedback_template_seeds_current_requests(tmp_path, monkeypatch):
+    repo_dir = tmp_path
+    memory_dir = repo_dir / "artifacts" / "memory"
+    memory_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(
+        human_feedback_module,
+        "_repo_dir_from_memory",
+        lambda path: repo_dir,
+    )
+
+    path = write_manual_human_feedback_response_template(
+        memory_dir,
+        {
+            "items": [
+                {"kind": "evaluation"},
+                {"kind": "vram_headroom"},
+            ]
+        },
+    )
+    payload = read_manual_human_feedback_responses(memory_dir)
+
+    assert path.name == "lab_responses.json"
+    raw = path.read_text(encoding="utf-8")
+    assert "\"kind\": \"evaluation\"" in raw
+    assert "\"kind\": \"vram_headroom\"" in raw
+    assert payload["responses"] == []

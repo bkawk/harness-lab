@@ -19,6 +19,10 @@ def human_feedback_responses_path(memory_dir: Path) -> Path:
     return memory_dir / "human_feedback_responses.json"
 
 
+def manual_human_feedback_responses_path(memory_dir: Path) -> Path:
+    return _repo_dir_from_memory(memory_dir) / "docs" / "lab_responses.json"
+
+
 def default_human_feedback() -> dict:
     return {
         "summary": "The lab has no human-facing requests yet.",
@@ -96,6 +100,80 @@ def _repo_dir_from_memory(memory_dir: Path) -> Path:
     return memory_dir.parent.parent
 
 
+def _clean_manual_response(item: dict) -> dict:
+    kind = str(item.get("kind", "")).strip()
+    status = str(item.get("status", "")).strip()
+    human_response = str(item.get("human_response", "")).strip()
+    next_action = str(item.get("next_action", "")).strip()
+    updated_at = str(item.get("updated_at", "")).strip()
+    if not kind or (not human_response and not next_action):
+        return {}
+    response_summary = human_response or next_action
+    if human_response and next_action:
+        response_summary = f"{human_response} Next: {next_action}"
+    return {
+        "kind": kind,
+        "commit_sha": "",
+        "commit_subject": "",
+        "response_summary": response_summary,
+        "status": status or "responded_manually",
+        "response_source": "manual",
+        "human_response": human_response,
+        "next_action": next_action,
+        "updated_at": updated_at,
+    }
+
+
+def read_manual_human_feedback_responses(memory_dir: Path) -> dict:
+    path = manual_human_feedback_responses_path(memory_dir)
+    if not path.exists():
+        return {"summary": "No manual human responses recorded yet.", "responses": []}
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {"summary": "Manual human responses file is invalid JSON.", "responses": []}
+    responses = []
+    for item in payload.get("responses", []):
+        if not isinstance(item, dict):
+            continue
+        cleaned = _clean_manual_response(item)
+        if cleaned:
+            responses.append(cleaned)
+    summary = (
+        f"The humans manually responded to {len(responses)} lab request(s)."
+        if responses
+        else "No manual human responses recorded yet."
+    )
+    return {"summary": summary, "responses": responses}
+
+
+def write_manual_human_feedback_response_template(memory_dir: Path, human_feedback: dict | None = None) -> Path:
+    path = manual_human_feedback_responses_path(memory_dir)
+    if path.exists():
+        return path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    items = human_feedback.get("items", []) if isinstance(human_feedback, dict) else []
+    responses = [
+        {
+            "kind": str(item.get("kind", "")).strip(),
+            "status": "",
+            "human_response": "",
+            "next_action": "",
+            "updated_at": "",
+        }
+        for item in items[:5]
+        if str(item.get("kind", "")).strip()
+    ]
+    write_json(
+        path,
+        {
+            "summary": "Add manual responses here. Any non-empty human_response or next_action will appear in What We Did.",
+            "responses": responses,
+        },
+    )
+    return path
+
+
 def _git_log(repo_dir: Path, limit: int = 80) -> list[dict]:
     try:
         completed = subprocess.run(
@@ -121,6 +199,13 @@ def build_human_feedback_responses(memory_dir: Path) -> dict:
     commits = _git_log(repo_dir)
     responses: list[dict] = []
     seen_kinds: set[str] = set()
+    manual_payload = read_manual_human_feedback_responses(memory_dir)
+    for response in manual_payload.get("responses", []):
+        kind = str(response.get("kind", "")).strip()
+        if not kind or kind in seen_kinds:
+            continue
+        responses.append(response)
+        seen_kinds.add(kind)
     for commit in commits:
         subject = str(commit.get("subject", ""))
         for rule in RESPONSE_RULES:
@@ -423,8 +508,10 @@ def build_human_feedback(memory_dir: Path) -> dict:
 def write_human_feedback(memory_dir: Path, output_path: Path | None = None) -> Path:
     memory_dir.mkdir(parents=True, exist_ok=True)
     write_human_feedback_responses(memory_dir)
+    human_feedback = build_human_feedback(memory_dir)
+    write_manual_human_feedback_response_template(memory_dir, human_feedback)
     path = output_path or human_feedback_path(memory_dir)
-    write_json(path, build_human_feedback(memory_dir))
+    write_json(path, human_feedback)
     return path
 
 

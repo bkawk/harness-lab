@@ -1,0 +1,19 @@
+{
+  "responses": [
+    {
+      "human_response": "",
+      "kind": "evaluation",
+      "next_action": "",
+      "status": "",
+      "updated_at": ""
+    },
+    {
+      "human_response": "",
+      "kind": "vram_headroom",
+      "next_action": "",
+      "status": "",
+      "updated_at": ""
+    }
+  ],
+  "summary": "Add manual responses here. Any non-empty human_response or next_action will appear in What We Did."
+}

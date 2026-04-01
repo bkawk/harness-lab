@@ -10,7 +10,12 @@ from harness_lab.backend import read_backend_profile, write_backend_profile
 from harness_lab.budget import read_budget, write_budget
 from harness_lab.diversity import read_diversity, write_diversity
 from harness_lab.external_review import maybe_request_external_review, read_external_review
-from harness_lab.human_feedback import read_human_feedback, read_human_feedback_responses, write_human_feedback
+from harness_lab.human_feedback import (
+    manual_human_feedback_responses_path,
+    read_human_feedback,
+    read_human_feedback_responses,
+    write_human_feedback,
+)
 from harness_lab.hindsight import write_hindsight
 from harness_lab.memory import build_candidate_index
 from harness_lab.mutation_brief import render_next_change_markdown, write_mutation_brief
@@ -222,12 +227,19 @@ def render_big_bang_markdown(
     ]
     if not ranked_human_lines:
         ranked_human_lines = ["- the lab has no ranked human requests yet"]
-    response_lines = [
-        f"- `{item.get('kind', '')}` addressed by `{str(item.get('commit_sha', ''))[:7]}`: `{item.get('response_summary', '')}`"
-        for item in human_feedback_responses.get("responses", [])[:5]
-    ]
+    response_lines = []
+    for item in human_feedback_responses.get("responses", [])[:5]:
+        kind = str(item.get("kind", "")).strip() or "-"
+        summary = str(item.get("response_summary", "")).strip() or "No response summary."
+        commit_sha = str(item.get("commit_sha", "")).strip()
+        if commit_sha:
+            response_lines.append(f"- `{kind}` addressed by `{commit_sha[:7]}`: `{summary}`")
+            continue
+        status = str(item.get("status", "")).strip() or "responded_manually"
+        response_lines.append(f"- `{kind}` {status}: `{summary}`")
     if not response_lines:
         response_lines = ["- no recent human responses recorded yet"]
+    manual_response_relpath = manual_human_feedback_responses_path(memory_dir).relative_to(repo_dir)
     module_lookup = {
         str(item.get("module", "")).strip(): item
         for item in backend_module_summary.get("modules", [])
@@ -449,6 +461,7 @@ def render_big_bang_markdown(
             "",
             "## What We Did",
             f"- summary: `{human_feedback_responses.get('summary', 'No recent human responses recorded yet.')}`",
+            f"- response_file: `{manual_response_relpath}`",
             *response_lines,
             "",
             "## Diversity",
