@@ -41,8 +41,8 @@ def _backend_lever_catalog() -> dict:
             "eval_reserve_seconds": {"default": 120, "min": 60, "max": 240, "effect": "Reserves wall-clock time for benchmark, smoke, and audit after training ends."},
         },
         "science_train": {
-            "batch_size": {"default": 2, "min": 1, "max": 4, "effect": "Controls training batch size; larger values can use more VRAM and smooth gradients."},
-            "eval_batch_size": {"default": 2, "min": 1, "max": 4, "effect": "Controls evaluation batch size; larger values can speed evaluation but use more VRAM."},
+            "batch_size": {"default": 2, "choices": [2, 3, 4], "min": 1, "max": 4, "effect": "Controls training batch size; larger values are the fastest bounded way to use more VRAM and smooth gradients."},
+            "eval_batch_size": {"default": 2, "choices": [2, 3, 4], "min": 1, "max": 4, "effect": "Controls evaluation batch size; larger values can speed evaluation and use more VRAM."},
             "grad_clip": {"default": 1.0, "min": 0.5, "max": 2.0, "effect": "Controls gradient clipping strength; smaller values are more conservative."},
             "log_interval": {"default": 20, "min": 5, "max": 100, "effect": "Controls how often training progress is logged; smaller values give more visibility at slight overhead."},
         },

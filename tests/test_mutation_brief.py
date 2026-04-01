@@ -153,3 +153,32 @@ def test_mutation_brief_targets_science_loss_for_boundary_failure_modes(tmp_path
 
     assert payload["target_module"] == "science_loss"
     assert "boundary-transfer specific" in payload["module_rationale"]
+
+
+def test_mutation_brief_targets_science_train_for_vram_headroom(tmp_path, monkeypatch):
+    memory_dir = tmp_path / "artifacts" / "memory"
+    candidates_dir = tmp_path / "artifacts" / "candidates"
+    memory_dir.mkdir(parents=True)
+    candidates_dir.mkdir(parents=True)
+    monkeypatch.setattr("harness_lab.mutation_brief._last_structural_commit", lambda repo_dir: "abc123")
+    monkeypatch.setattr(
+        "harness_lab.mutation_brief._commit_timestamp",
+        lambda repo_dir, commit_sha: __import__("datetime").datetime(2026, 4, 1, 0, 0, tzinfo=__import__("datetime").timezone.utc),
+    )
+    write_json(
+        memory_dir / "human_feedback.json",
+        {"items": [{"kind": "vram_headroom", "summary": "Use more VRAM.", "priority": 5}], "summary": "x"},
+    )
+    write_json(memory_dir / "hindsight.json", {"summary": "VRAM headroom remains large.", "policy_adjustments": []})
+    write_json(memory_dir / "policy.json", {"selection_mode": "stabilize", "summary": "Favor transfer stability."})
+    write_json(memory_dir / "budget.json", {"summary": "Broaden exhausted lines."})
+    write_json(memory_dir / "backend_profile.json", {"summary": "Real command backend available."})
+    write_json(memory_dir / "science_summary.json", {"trend_summary": "Benchmark is outrunning audit."})
+    write_json(memory_dir / "science_debug_summary.json", {"summary": "VRAM headroom is present.", "likely_issue": "vram_headroom"})
+    write_json(memory_dir / "backend_module_summary.json", {"modules": [{"module": "science_model", "attempts": 3, "avg_transfer_gap": 0.04}]})
+    write_json(memory_dir / "candidate_index.json", {"candidates": []})
+
+    payload = build_mutation_brief(candidates_dir, memory_dir)
+
+    assert payload["target_module"] == "science_train"
+    assert "batch-size move" in payload["module_rationale"]

@@ -35,7 +35,7 @@ def _failure_mode_target(hindsight: dict, top_request: dict) -> tuple[str, str] 
     if any(label in {"transfer_collapse", "transfer_regression", "hard_transfer_regression", "local_only_gain"} for label in recent_failures):
         return "science_model", "Recent failures point to transfer behavior that likely depends on model capacity and representation quality."
     if top_request_kind == "vram_headroom":
-        return "science_model", "The top live pressure is unused VRAM headroom, so a bounded model-capacity move is the best next target."
+        return "science_train", "The top live pressure is unused VRAM headroom, so a bounded batch-size move is the best next target before larger architectural jumps."
     return None
 
 

@@ -121,6 +121,7 @@ def test_llm_proposal_can_author_draft(tmp_path, monkeypatch):
     assert "backend_lever_catalog" in seen["prompt"]
     assert "returning empty backend_levers is discouraged" in seen["prompt"]
     assert "Prefer one or two small coordinated lever moves" in seen["prompt"]
+    assert "science_train -> {batch_size: 3, eval_batch_size: 3}" in seen["prompt"]
     assert "Good examples" in seen["prompt"]
 
 
