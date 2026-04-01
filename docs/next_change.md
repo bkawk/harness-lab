@@ -1,21 +1,21 @@
 # Next Change
 
-- summary: Current priority is `evaluation`, but only 2 scored candidate(s) have landed since the last structural change, so broad mutation should wait while conservative lever nudges remain allowed.
-- recommended_action: `wait`
+- summary: Current priority is `evaluation` with selection mode `stabilize`.
+- recommended_action: `targeted_mutation`
 - target_module: `science_model`
 
 ## Problem
 - Improve transfer-stability evaluation or smoke tests so promising candidates fail earlier before full audit.
 
 ## Why This Module
-- Recent backend edits are concentrated in `science_model` with average transfer gap 0.038163. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation. Hold off on broad mutation until the post-change sample is less thin. Small conservative lever nudges are still allowed. 2 scored candidate(s) have landed since structural commit `2be55f0`.
+- Recent backend edits are concentrated in `science_model` with average transfer gap 0.038648. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation.
 
 ## Secondary Context
-- Recent real-backend runs are only using about 590.5 MB on average, leaving most VRAM unused. 2 scored candidate(s) have landed since structural commit `2be55f0`.
+- Recent real-backend runs are only using about 589.9 MB on average, leaving most VRAM unused. 3 scored candidate(s) have landed since structural commit `2be55f0`.
 
 ## Options
-- [Option] Mutate science_model: Recent backend edits are concentrated in `science_model` with average transfer gap 0.038163. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation. Hold off on broad mutation until the post-change sample is less thin. Small conservative lever nudges are still allowed. 2 scored candidate(s) have landed since structural commit `2be55f0`.
-- [Recommended] Wait on broad mutation: Only 2 scored candidate(s) have landed since the last structural change; wait on broad mutation until at least 3 post-change scored candidates exist, but conservative lever nudges are still allowed.
+- [Recommended] Mutate science_model: Recent backend edits are concentrated in `science_model` with average transfer gap 0.038648. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation.
+- [Option] Wait on broad mutation: Recent evidence may still be too thin or too noisy for broad mutation, but conservative lever nudges are still allowed while more scored candidates accumulate.
 
 ## Evidence
 - `artifacts/memory/hindsight.json`
