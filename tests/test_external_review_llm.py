@@ -118,3 +118,23 @@ class TestExternalReviewFallbackChain:
         })
         result = maybe_request_external_review(candidates_dir, memory_dir)
         assert result["status"] == "idle"
+
+    def test_heuristic_review_uses_recent_failure_window_for_human_advice(self, tmp_path):
+        index = {
+            "candidate_count": 20,
+            "candidates": [
+                {
+                    "candidate_id": f"cand_{i:04d}",
+                    "outcome_label": "audit_blocked",
+                    "diagnosis_mechanism": "initial_harness",
+                    "observed_failure_modes": (["science_backend_error"] if i < 10 else ["transfer_smoke_failed"]),
+                }
+                for i in range(20)
+            ],
+            "failure_mode_counts": {"science_backend_error": 10, "transfer_smoke_failed": 10},
+            "diagnosis_mechanism_counts": {"initial_harness": 20},
+        }
+        payload = _heuristic_review_payload(index, {"over_explored_backend_fingerprints": [], "under_explored_backend_fingerprints": []}, {"selection_mode": "stabilize"}, "repeated_audit_blocked", 20)
+        summaries = [item["summary"] for item in payload["human_advice"]]
+        assert any("transfer_smoke_failed" in summary for summary in summaries)
+        assert all("science_backend_error" not in summary for summary in summaries)

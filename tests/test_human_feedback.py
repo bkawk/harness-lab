@@ -38,6 +38,9 @@ def test_human_feedback_adds_transfer_and_ops_requests(tmp_path):
         {
             "top_outcomes": [{"label": "audit_blocked", "count": 4}],
             "top_failure_modes": [{"label": "stale_process", "count": 2}],
+            "recent_scored_candidate_count": 8,
+            "recent_top_outcomes": [{"label": "audit_blocked", "count": 4}],
+            "recent_top_failure_modes": [{"label": "stale_process", "count": 2}],
             "summary": "",
             "hindsight_findings": [],
             "policy_adjustments": [],
@@ -62,6 +65,9 @@ def test_human_feedback_lowers_priority_for_recently_addressed_requests(tmp_path
         {
             "top_outcomes": [{"label": "audit_blocked", "count": 4}],
             "top_failure_modes": [{"label": "stale_process", "count": 2}],
+            "recent_scored_candidate_count": 8,
+            "recent_top_outcomes": [{"label": "audit_blocked", "count": 4}],
+            "recent_top_failure_modes": [{"label": "stale_process", "count": 2}],
             "summary": "",
             "hindsight_findings": [],
             "policy_adjustments": [],
@@ -111,6 +117,9 @@ def test_human_feedback_reescalates_addressed_ops_when_failures_persist(tmp_path
         {
             "top_outcomes": [{"label": "audit_blocked", "count": 2}],
             "top_failure_modes": [{"label": "startup_timeout", "count": 12}],
+            "recent_scored_candidate_count": 8,
+            "recent_top_outcomes": [{"label": "audit_blocked", "count": 2}],
+            "recent_top_failure_modes": [{"label": "startup_timeout", "count": 12}],
             "summary": "",
             "hindsight_findings": [],
             "policy_adjustments": [],
@@ -148,6 +157,9 @@ def test_human_feedback_adds_vram_request_on_oom_pressure(tmp_path):
         {
             "top_outcomes": [],
             "top_failure_modes": [{"label": "cuda_oom", "count": 2}],
+            "recent_scored_candidate_count": 8,
+            "recent_top_outcomes": [],
+            "recent_top_failure_modes": [{"label": "cuda_oom", "count": 2}],
             "summary": "",
             "hindsight_findings": [],
             "policy_adjustments": [],
@@ -160,3 +172,68 @@ def test_human_feedback_adds_vram_request_on_oom_pressure(tmp_path):
     vram_item = next(item for item in payload["items"] if item["kind"] == "vram")
     assert vram_item["priority"] >= 9
     assert "memory-pressure failure" in vram_item["why_now"]
+
+
+def test_human_feedback_suppresses_stale_failure_advice_when_recent_window_is_clean(tmp_path):
+    memory_dir = tmp_path / "memory"
+    memory_dir.mkdir(parents=True, exist_ok=True)
+    write_json(memory_dir / "external_review.json", {"status": "idle", "human_advice": []})
+    write_json(
+        memory_dir / "hindsight.json",
+        {
+            "top_outcomes": [{"label": "audit_blocked", "count": 12}],
+            "top_failure_modes": [{"label": "science_backend_error", "count": 49}, {"label": "startup_timeout", "count": 33}],
+            "recent_scored_candidate_count": 10,
+            "recent_top_outcomes": [{"label": "audit_blocked", "count": 6}],
+            "recent_top_failure_modes": [{"label": "transfer_smoke_failed", "count": 5}],
+            "summary": "",
+            "hindsight_findings": [],
+            "policy_adjustments": [],
+        },
+    )
+    write_json(memory_dir / "policy.json", {"summary": "Prioritize transfer stability."})
+    write_json(memory_dir / "science_summary.json", {"leaders": {"best_stable": {"candidate_id": "cand_0209"}}})
+
+    payload = build_human_feedback(memory_dir)
+    kinds = [item["kind"] for item in payload["items"]]
+    assert "evaluation" in kinds
+    assert "ops" not in kinds
+    assert "vram" not in kinds
+
+
+def test_human_feedback_filters_stale_external_review_failure_advice(tmp_path):
+    memory_dir = tmp_path / "memory"
+    memory_dir.mkdir(parents=True, exist_ok=True)
+    write_json(
+        memory_dir / "external_review.json",
+        {
+            "status": "reviewed",
+            "trigger_reason": "exhaustion_signal",
+            "confidence": 0.55,
+            "evidence_used": ["artifacts/memory/candidate_index.json"],
+            "human_advice": [
+                {
+                    "kind": "non_self_evolving",
+                    "summary": "Consider strengthening the non-self-evolving seed around `science_backend_error` if that failure mode keeps dominating.",
+                }
+            ],
+        },
+    )
+    write_json(
+        memory_dir / "hindsight.json",
+        {
+            "top_outcomes": [{"label": "audit_blocked", "count": 12}],
+            "top_failure_modes": [{"label": "science_backend_error", "count": 49}],
+            "recent_scored_candidate_count": 10,
+            "recent_top_outcomes": [{"label": "audit_blocked", "count": 6}],
+            "recent_top_failure_modes": [{"label": "transfer_smoke_failed", "count": 5}],
+            "summary": "",
+            "hindsight_findings": [],
+            "policy_adjustments": [],
+        },
+    )
+    write_json(memory_dir / "policy.json", {"summary": "Prioritize transfer stability."})
+    write_json(memory_dir / "science_summary.json", {"leaders": {"best_stable": {"candidate_id": "cand_0209"}}})
+
+    payload = build_human_feedback(memory_dir)
+    assert all("science_backend_error" not in item["summary"] for item in payload["items"])
