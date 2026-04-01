@@ -37,6 +37,22 @@ def _response_discount(response: dict | None, *, persistence: bool, default_disc
     return 0 if persistence else default_discount
 
 
+def _label_counts(items: list[dict]) -> dict[str, int]:
+    return {
+        str(item.get("label", "")).strip(): int(item.get("count", 0) or 0)
+        for item in items
+        if str(item.get("label", "")).strip()
+    }
+
+
+def _quoted_identifier(text: str) -> str:
+    summary = str(text)
+    parts = summary.split("`")
+    if len(parts) >= 3:
+        return str(parts[1]).strip()
+    return ""
+
+
 RESPONSE_RULES = (
     {
         "kind": "evaluation",
@@ -141,6 +157,11 @@ def build_human_feedback(memory_dir: Path) -> dict:
         for item in responses_payload.get("responses", [])
         if str(item.get("kind", "")).strip()
     }
+    top_outcomes = _label_counts(hindsight.get("top_outcomes", []))
+    top_failures = _label_counts(hindsight.get("top_failure_modes", []))
+    recent_top_outcomes = _label_counts(hindsight.get("recent_top_outcomes", []))
+    recent_top_failures = _label_counts(hindsight.get("recent_top_failure_modes", []))
+    recent_scored_candidate_count = int(hindsight.get("recent_scored_candidate_count", 0) or 0)
 
     items: list[dict] = []
 
@@ -149,6 +170,10 @@ def build_human_feedback(memory_dir: Path) -> dict:
         kind = str(item.get("kind", "non_self_evolving")).strip() or "non_self_evolving"
         if not summary:
             continue
+        if kind == "non_self_evolving" and recent_scored_candidate_count > 0:
+            referenced_failure = _quoted_identifier(summary)
+            if referenced_failure and recent_top_failures.get(referenced_failure, 0) == 0:
+                continue
         response = response_by_kind.get(kind)
         priority = _score_item(leverage=5, urgency=4, recurrence=3, cost=2)
         why_now = str(external_review.get("trigger_reason", "") or "external_review")
@@ -168,12 +193,10 @@ def build_human_feedback(memory_dir: Path) -> dict:
             }
         )
 
-    top_outcomes = {str(item.get("label", "")): int(item.get("count", 0) or 0) for item in hindsight.get("top_outcomes", [])}
-    top_failures = {str(item.get("label", "")): int(item.get("count", 0) or 0) for item in hindsight.get("top_failure_modes", [])}
     leaders = science_summary.get("leaders", {})
     best_stable = leaders.get("best_stable", {})
 
-    audit_blocked_count = top_outcomes.get("audit_blocked", 0)
+    audit_blocked_count = recent_top_outcomes.get("audit_blocked", 0)
     if audit_blocked_count >= 3:
         response = response_by_kind.get("evaluation")
         persistence = bool(response) and audit_blocked_count >= 6
@@ -203,10 +226,10 @@ def build_human_feedback(memory_dir: Path) -> dict:
             }
         )
 
-    stale_process_count = top_failures.get("stale_process", 0)
-    startup_issue_count = top_failures.get("startup_timeout", 0)
-    no_progress_count = top_failures.get("no_progress_timeout", 0)
-    oom_count = top_failures.get("cuda_oom", 0) + top_failures.get("oom", 0) + top_failures.get("vram_pressure", 0)
+    stale_process_count = recent_top_failures.get("stale_process", 0)
+    startup_issue_count = recent_top_failures.get("startup_timeout", 0)
+    no_progress_count = recent_top_failures.get("no_progress_timeout", 0)
+    oom_count = recent_top_failures.get("cuda_oom", 0) + recent_top_failures.get("oom", 0) + recent_top_failures.get("vram_pressure", 0)
     if stale_process_count >= 1 or startup_issue_count >= 1 or no_progress_count >= 1:
         response = response_by_kind.get("ops")
         total_ops_failures = stale_process_count + startup_issue_count + no_progress_count
@@ -291,7 +314,7 @@ def build_human_feedback(memory_dir: Path) -> dict:
     policy_summary = str(policy.get("summary", "")).strip()
     if "transfer" in policy_summary.lower():
         response = response_by_kind.get("dataset")
-        transfer_failure_count = top_failures.get("transfer_collapse", 0) + top_failures.get("transfer_regression", 0)
+        transfer_failure_count = recent_top_failures.get("transfer_collapse", 0) + recent_top_failures.get("transfer_regression", 0)
         persistence = bool(response) and (audit_blocked_count >= 6 or transfer_failure_count >= 4)
         items.append(
             {
@@ -319,6 +342,11 @@ def build_human_feedback(memory_dir: Path) -> dict:
             }
         )
 
+    for item in items:
+        item["recent_scored_candidate_count"] = recent_scored_candidate_count
+        if item["source"] in {"hindsight", "policy", "science_debug"} and recent_scored_candidate_count > 0:
+            item["recent_window_required"] = True
+
     deduped: dict[tuple[str, str], dict] = {}
     for item in items:
         key = (str(item.get("kind", "")), str(item.get("summary", "")))
@@ -326,8 +354,37 @@ def build_human_feedback(memory_dir: Path) -> dict:
         if existing is None or float(item.get("confidence", 0.0)) > float(existing.get("confidence", 0.0)):
             deduped[key] = item
 
+    filtered = [
+        item
+        for item in deduped.values()
+        if not (
+            bool(item.get("recent_window_required"))
+            and int(item.get("recent_scored_candidate_count", 0) or 0) > 0
+            and int(item.get("priority", 0) or 0) > 0
+            and item["kind"] in {"evaluation", "ops", "vram", "dataset"}
+            and (
+                (
+                    item["kind"] == "evaluation"
+                    and audit_blocked_count == 0
+                )
+                or (
+                    item["kind"] == "ops"
+                    and (stale_process_count + startup_issue_count + no_progress_count) == 0
+                )
+                or (
+                    item["kind"] == "vram"
+                    and oom_count == 0
+                )
+                or (
+                    item["kind"] == "dataset"
+                    and (audit_blocked_count + transfer_failure_count) == 0
+                )
+            )
+        )
+    ]
+
     ranked = sorted(
-        deduped.values(),
+        filtered,
         key=lambda item: (
             -int(item.get("priority", 0) or 0),
             -float(item.get("confidence", 0.0) or 0.0),

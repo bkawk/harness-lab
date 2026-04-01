@@ -8,13 +8,13 @@
 - Improve transfer-stability evaluation or smoke tests so promising candidates fail earlier before full audit.
 
 ## Why This Module
-- Recent backend edits are concentrated in `science_model` with average transfer gap 0.038986. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation. Hold off on a mutation until the post-change sample is less thin. 0 scored candidate(s) have landed since structural commit `575060b`.
+- Recent backend edits are concentrated in `science_model` with average transfer gap 0.039027. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation. Hold off on a mutation until the post-change sample is less thin. 0 scored candidate(s) have landed since structural commit `1a7a959`.
 
 ## Secondary Context
-- Recent real-backend runs are only using about 592.4 MB on average, leaving most VRAM unused. 0 scored candidate(s) have landed since structural commit `575060b`.
+- Recent real-backend runs are only using about 589.2 MB on average, leaving most VRAM unused. 0 scored candidate(s) have landed since structural commit `1a7a959`.
 
 ## Options
-- [Option] Mutate science_model: Recent backend edits are concentrated in `science_model` with average transfer gap 0.038986. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation. Hold off on a mutation until the post-change sample is less thin. 0 scored candidate(s) have landed since structural commit `575060b`.
+- [Option] Mutate science_model: Recent backend edits are concentrated in `science_model` with average transfer gap 0.039027. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation. Hold off on a mutation until the post-change sample is less thin. 0 scored candidate(s) have landed since structural commit `1a7a959`.
 - [Recommended] Wait for more data: Only 0 scored candidate(s) have landed since the last structural change; wait until at least 3 post-change scored candidates exist.
 
 ## Evidence

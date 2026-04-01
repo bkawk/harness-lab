@@ -60,6 +60,27 @@ def _recent_streak(candidates: list[dict], label: str) -> int:
     return streak
 
 
+def _recent_failure_counts(candidates: list[dict], *, window: int = 10) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for item in candidates[-window:]:
+        for label in item.get("observed_failure_modes", []) or []:
+            key = str(label).strip()
+            if not key:
+                continue
+            counts[key] = counts.get(key, 0) + 1
+    return counts
+
+
+def _recent_mechanism_counts(candidates: list[dict], *, window: int = 10) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for item in candidates[-window:]:
+        key = str(item.get("diagnosis_mechanism", "") or item.get("harness_component", "")).strip()
+        if not key:
+            continue
+        counts[key] = counts.get(key, 0) + 1
+    return counts
+
+
 def _review_trigger(index: dict, hindsight: dict, previous: dict, *, force: bool = False) -> tuple[bool, str, int]:
     candidate_count = int(index.get("candidate_count", 0) or 0)
     interval = int(previous.get("review_interval_candidates", 10) or 10)
@@ -91,8 +112,9 @@ def _review_trigger(index: dict, hindsight: dict, previous: dict, *, force: bool
 
 
 def _heuristic_review_payload(index: dict, hindsight: dict, policy: dict, trigger_reason: str, candidate_count: int) -> dict:
-    top_failures = sorted(index.get("failure_mode_counts", {}).items(), key=lambda item: (-item[1], item[0]))
-    top_mechanisms = sorted(index.get("diagnosis_mechanism_counts", {}).items(), key=lambda item: (-item[1], item[0]))
+    candidates = list(index.get("candidates", []))
+    top_failures = sorted(_recent_failure_counts(candidates).items(), key=lambda item: (-item[1], item[0]))
+    top_mechanisms = sorted(_recent_mechanism_counts(candidates).items(), key=lambda item: (-item[1], item[0]))
     over_backend = hindsight.get("over_explored_backend_fingerprints", [])
     under_backend = hindsight.get("under_explored_backend_fingerprints", [])
     lab_advice: list[dict] = []
