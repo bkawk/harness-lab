@@ -8,7 +8,7 @@ from pathlib import Path
 
 log = logging.getLogger("harness_lab.proposal")
 
-from harness_lab.bootstrap import write_bootstrap_snapshot, write_decision_bundle
+from harness_lab.bootstrap import _backend_lever_catalog, write_bootstrap_snapshot, write_decision_bundle
 from harness_lab.budget import read_budget
 from harness_lab.datasets import choose_best_prepared_dataset, get_dataset_record
 from harness_lab.diversity import read_diversity
@@ -411,6 +411,7 @@ def _llm_proposal_prompt(
     *,
     bootstrap_snapshot: dict,
     decision_bundle: dict,
+    mutation_brief: dict,
     parent_diagnosis: dict,
     parent_summary: dict,
     branching_mode: str,
@@ -436,6 +437,7 @@ def _llm_proposal_prompt(
             "audit_score": parent_summary.get("audit_score"),
         },
         "branching_mode": branching_mode,
+        "mutation_brief": mutation_brief,
         "fallback_draft": {
             "rationale": fallback_rationale,
             "target": fallback_target,
@@ -458,10 +460,22 @@ def _llm_proposal_prompt(
     )
 
 
-def _mutation_brief_target_module(memory_dir: Path) -> str:
+def _mutation_brief_state(memory_dir: Path) -> dict:
     brief = read_json(memory_dir / "mutation_brief.json")
+    if not isinstance(brief, dict):
+        return {}
     target_module = str(brief.get("target_module", "")).strip()
-    return target_module if target_module in ALLOWED_BACKEND_MODULES else ""
+    if target_module and target_module not in ALLOWED_BACKEND_MODULES:
+        target_module = ""
+    return {
+        "recommended_action": str(brief.get("recommended_action", "")).strip() or "wait",
+        "target_module": target_module,
+        "summary": str(brief.get("summary", "")).strip(),
+    }
+
+
+def _mutation_brief_target_module(memory_dir: Path) -> str:
+    return str(_mutation_brief_state(memory_dir).get("target_module", ""))
 
 
 def _mutation_brief_change_items(target_module: str) -> tuple[dict, ...]:
@@ -495,6 +509,28 @@ def _normalize_backend_levers(payload: dict) -> dict:
         if clean:
             normalized[module_key] = clean
     return normalized
+
+
+def _soft_wait_backend_levers(backend_levers: dict, mutation_brief: dict) -> dict:
+    if not backend_levers:
+        return {}
+    if str(mutation_brief.get("recommended_action", "")).strip() != "wait":
+        return backend_levers
+    target_module = str(mutation_brief.get("target_module", "")).strip()
+    if target_module not in ALLOWED_BACKEND_MODULES:
+        return {}
+    module_levers = backend_levers.get(target_module, {})
+    if not isinstance(module_levers, dict) or not module_levers:
+        return {}
+    catalog = _backend_lever_catalog().get(target_module, {})
+    limited: dict[str, float | int] = {}
+    for lever_name, value in module_levers.items():
+        if lever_name not in catalog:
+            continue
+        limited[lever_name] = value
+        if len(limited) >= 2:
+            break
+    return {target_module: limited} if limited else {}
 
 
 def _normalize_llm_proposal_payload(payload: dict, fallback_target: dict, fallback_changes: tuple[dict, ...], fallback_rationale: str) -> tuple[str, dict, tuple[dict, ...], dict] | None:
@@ -536,6 +572,7 @@ def _maybe_llm_author_proposal(
     candidate_root: Path,
     bootstrap_snapshot: dict,
     decision_bundle: dict,
+    mutation_brief: dict,
     parent_diagnosis: dict,
     parent_summary: dict,
     branching_mode: str,
@@ -550,6 +587,7 @@ def _maybe_llm_author_proposal(
         _llm_proposal_prompt(
             bootstrap_snapshot=bootstrap_snapshot,
             decision_bundle=decision_bundle,
+            mutation_brief=mutation_brief,
             parent_diagnosis=parent_diagnosis,
             parent_summary=parent_summary,
             branching_mode=branching_mode,
@@ -563,8 +601,10 @@ def _maybe_llm_author_proposal(
     if not normalized:
         log.warning("proposal: claude fallback to heuristic (payload=%s)", "empty" if not payload else "invalid")
         return fallback_rationale, fallback_target, fallback_changes, fallback_backend_levers
+    rationale, target, changes, backend_levers = normalized
+    backend_levers = _soft_wait_backend_levers(backend_levers, mutation_brief)
     log.info("proposal authored by claude")
-    return normalized
+    return rationale, target, changes, backend_levers
 
 
 def draft_proposal_for_candidate(
@@ -607,7 +647,8 @@ def draft_proposal_for_candidate(
     )
     bootstrap_snapshot = read_json(bootstrap_path)
     decision_bundle = read_json(decision_bundle_path)
-    mutation_brief_target = _mutation_brief_target_module(memory_dir)
+    mutation_brief = _mutation_brief_state(memory_dir)
+    mutation_brief_target = str(mutation_brief.get("target_module", ""))
 
     if chosen_parent is None:
         mechanism = mutation_brief_target or "initial_harness"
@@ -643,6 +684,7 @@ def draft_proposal_for_candidate(
             parent_summary={},
             branching_mode="genesis",
             decision_bundle=decision_bundle,
+            mutation_brief=mutation_brief,
             fallback_target=target,
             fallback_changes=changes,
             fallback_rationale=rationale,
@@ -719,6 +761,7 @@ def draft_proposal_for_candidate(
     rationale, target, changes, backend_levers = _maybe_llm_author_proposal(
         candidate_root=candidate_root,
         bootstrap_snapshot=bootstrap_snapshot,
+        mutation_brief=mutation_brief,
         parent_diagnosis=parent_diagnosis,
         parent_summary=parent_summary,
         branching_mode=branching_mode,
