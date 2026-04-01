@@ -6,18 +6,18 @@ The GitHub repo is the lab dashboard.
 - status: `running`
 - vital_spark_at: `2026-03-31T10:12:12+00:00`
 - started_at: `2026-03-31T22:07:51+00:00`
-- last_heartbeat: `2026-04-01T02:10:57+00:00`
-- cycles_completed: `23`
+- last_heartbeat: `2026-04-01T02:21:33+00:00`
+- cycles_completed: `24`
 - genesis seed: `cand_0001`
-- last candidate: `cand_0176`
+- last candidate: `cand_0177`
 - last dataset: `abc_boundary512`
 - last commit: `-`
 - last publish message: `Publishing skipped.`
 - last cycle mode: `novelty_cycle`
-- novelty cycles triggered: `23`
+- novelty cycles triggered: `24`
 
 ## Latest Step
-- candidate: `cand_0176`
+- candidate: `cand_0177`
 - dataset: `abc_boundary512` via `reused_prepared_dataset`
 - seed action: `existing`
 - proposal status: `candidate`
@@ -37,35 +37,36 @@ The GitHub repo is the lab dashboard.
 - backend_poll_interval_seconds: `-`
 
 ## Recent Candidates
+- `cand_0177`: outcome `dead_end`; diagnosis `complete`; benchmark `0.3639046391840973`
 - `cand_0176`: outcome `audit_blocked`; diagnosis `complete`; benchmark `0.30229167785837185`
 - `cand_0175`: outcome `audit_blocked`; diagnosis `complete`; benchmark `0.32597718606334886`
 - `cand_0174`: outcome `improved`; diagnosis `complete`; benchmark `0.26639875963606036`
 - `cand_0173`: outcome `audit_blocked`; diagnosis `complete`; benchmark `0.3361496020750038`
-- `cand_0172`: outcome `audit_blocked`; diagnosis `complete`; benchmark `0.3679953081293829`
 
 ## Science Leaders
 - best benchmark: `cand_0103` -> `0.448`
 - best audit: `cand_0103` -> `0.418`
 - tightest transfer: `cand_0146` -> gap `0.002621539638849979`
-- best stable: `cand_0168` -> audit `0.3564474663677673`
+- best stable: `cand_0177` -> audit `0.3589113262474345`
 
 ## Science Trend
-- summary: `Across the last 5 scored candidates, benchmark averaged 0.319763, audit averaged 0.274290, and the mean transfer gap was 0.045472.`
-- recent benchmark avg: `0.31976250675243356`
-- recent audit avg: `0.2742903469384089`
-- recent transfer gap avg: `0.045472159814024624`
+- summary: `Across the last 5 scored candidates, benchmark averaged 0.318944, audit averaged 0.290424, and the mean transfer gap was 0.028520.`
+- recent benchmark avg: `0.3189443729633764`
+- recent audit avg: `0.29042434983204296`
+- recent transfer gap avg: `0.028520023131333488`
+- `cand_0177`: benchmark `0.3639046391840973`, audit `0.3589113262474345`, gap `0.00499331293666283`
 - `cand_0176`: benchmark `0.30229167785837185`, audit `0.2137506580672137`, gap `0.08854101979115817`
 - `cand_0175`: benchmark `0.32597718606334886`, audit `0.2485482826525044`, gap `0.07742890341084446`
 - `cand_0174`: benchmark `0.26639875963606036`, audit `0.30563936789187574`, gap `-0.03924060825581538`
 - `cand_0173`: benchmark `0.3361496020750038`, audit `0.3252721143011864`, gap `0.010877487773817363`
-- `cand_0172`: benchmark `0.3679953081293829`, audit `0.2782413117792644`, gap `0.08975399635011849`
 
 ## Hindsight
-- summary: `In the recent scored window, the lab saw 7 audit-blocked outcomes; it should emphasize transfer-stability checks.`
+- summary: `In the recent scored window, the lab saw 6 audit-blocked outcomes; it should emphasize transfer-stability checks.`
+- adjustment: `Increase cooldown penalties for mechanisms with repeated dead_end outcomes.`
 - adjustment: `Raise priority for proposals that directly target transfer stability after an audit_blocked result.`
 
 ## Policy
-- summary: `Raise priority for proposals that directly target transfer stability after an audit_blocked result.`
+- summary: `Increase cooldown penalties for mechanisms with repeated dead_end outcomes.`
 - selection_mode: `stabilize`
 - cooldown_multiplier: `2.0`
 - preferred_runner_backend: `command`
@@ -84,40 +85,39 @@ The GitHub repo is the lab dashboard.
 - command_backend_configured: `True`
 
 ## Backend Science
-- summary: `Recent backend evolution is concentrated in science_backend (69 candidate(s), avg transfer gap 0.040958).`
+- summary: `Recent backend evolution is concentrated in science_backend (70 candidate(s), avg transfer gap 0.040413).`
 - recommended_action: `wait`
 - target_module: `science_model`
 - problem: `Improve transfer-stability evaluation or smoke tests so promising candidates fail earlier before full audit.`
-- why_this_module: `Recent backend edits are concentrated in `science_model` with average transfer gap 0.040958. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation. Hold off on a mutation until the post-change sample is less thin. 0 scored candidate(s) have landed since structural commit `320fcac`.`
-- secondary_context: `Recent real-backend runs are only using about 596.5 MB on average, leaving most VRAM unused. 0 scored candidate(s) have landed since structural commit `320fcac`.`
+- why_this_module: `Recent backend edits are concentrated in `science_model` with average transfer gap 0.040413. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation. Hold off on a mutation until the post-change sample is less thin. 0 scored candidate(s) have landed since structural commit `320fcac`.`
+- secondary_context: `Recent real-backend runs are only using about 595.9 MB on average, leaving most VRAM unused. 0 scored candidate(s) have landed since structural commit `320fcac`.`
 - scored_candidates_since_change: `0`
 - last_structural_commit: `320fcac`
 ### Modular Levers
-- model: `science_model` (targeted); attempts `69`, audit_blocked `60`, avg_gap `0.04095794152161368`
-- loss: `science_loss` (available); attempts `54`, audit_blocked `46`, avg_gap `0.041573847037350765`
-- eval: `science_eval` (available); attempts `61`, audit_blocked `52`, avg_gap `0.04077659998078753`
-- config: `science_config` (available); attempts `54`, audit_blocked `46`, avg_gap `0.041573847037350765`
-- train: `science_train` (available); attempts `47`, audit_blocked `39`, avg_gap `0.04175604997511111`
+- model: `science_model` (targeted); attempts `70`, audit_blocked `60`, avg_gap `0.04041302290669018`
+- loss: `science_loss` (available); attempts `55`, audit_blocked `46`, avg_gap `0.040870375227722154`
+- eval: `science_eval` (available); attempts `62`, audit_blocked `52`, avg_gap `0.040159646755888824`
+- config: `science_config` (available); attempts `55`, audit_blocked `46`, avg_gap `0.040870375227722154`
+- train: `science_train` (available); attempts `48`, audit_blocked `39`, avg_gap `0.040939100263145595`
 
 ### Recent Module Evidence
-- `science_backend`: attempts `69`, audit_blocked `60`, avg_gap `0.04095794152161368`
-- `science_model`: attempts `69`, audit_blocked `60`, avg_gap `0.04095794152161368`
-- `science_eval`: attempts `61`, audit_blocked `52`, avg_gap `0.04077659998078753`
-- `science_config`: attempts `54`, audit_blocked `46`, avg_gap `0.041573847037350765`
+- `science_backend`: attempts `70`, audit_blocked `60`, avg_gap `0.04041302290669018`
+- `science_model`: attempts `70`, audit_blocked `60`, avg_gap `0.04041302290669018`
+- `science_eval`: attempts `62`, audit_blocked `52`, avg_gap `0.040159646755888824`
+- `science_config`: attempts `55`, audit_blocked `46`, avg_gap `0.040870375227722154`
 
 ## External Review
-- status: `cooldown`
-- trigger_reason: `repeated_audit_blocked`
+- status: `idle`
+- trigger_reason: `-`
 - reviewer: `none`
 - summary: `No external review yet.`
 - lab advice: `No live external advice.`
 - human advice: `No human-facing advice.`
 
 ## What The Lab Wants
-- summary: `The lab has 4 ranked requests for human help.`
+- summary: `The lab has 3 ranked requests for human help.`
 - [12] `evaluation`: `Improve transfer-stability evaluation or smoke tests so promising candidates fail earlier before full audit.`
 - [9] `ops`: `Harden backend startup and completion reporting so stalled candidates stop consuming full budget.`
-- [7] `dataset`: `Consider improving the validation split or transfer-oriented data slices so the lab can distinguish local wins from robust gains sooner.`
 - [5] `vram_headroom`: `Consider increasing batch size or model capacity so the science backend uses more of the available VRAM.`
 
 ## What We Did
