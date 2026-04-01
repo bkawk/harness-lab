@@ -136,3 +136,30 @@ def test_invalid_llm_proposal_falls_back_to_heuristic(tmp_path, monkeypatch):
     draft = proposal_module.draft_proposal_for_candidate(candidates_dir, "cand_0002")
     assert "Parent drifted toward weak transfer." in draft.rationale
     assert any(change["kind"] == "counterfactual" for change in draft.changes)
+
+
+def test_mutation_brief_target_overrides_broad_parent_target(tmp_path, monkeypatch):
+    candidates_dir, memory_dir = _seed_parent(tmp_path)
+    write_json(
+        memory_dir / "mutation_brief.json",
+        {
+            "recommended_action": "wait",
+            "target_module": "science_model",
+        },
+    )
+    monkeypatch.delenv("HARNESS_LAB_LLM_PROPOSAL_ENABLED", raising=False)
+    monkeypatch.setattr(proposal_module, "choose_best_prepared_dataset", lambda memory_dir: {"dataset_id": "abc_boundary512_v64"})
+    monkeypatch.setattr(proposal_module, "get_dataset_record", lambda memory_dir, dataset_id: {"dataset_id": dataset_id, "status": "ready"})
+    monkeypatch.setattr(proposal_module, "read_hardware_profile", lambda memory_dir: {})
+    monkeypatch.setattr(proposal_module, "read_hindsight", lambda memory_dir: {"summary": "", "policy_adjustments": [], "over_explored_mechanisms": [], "under_explored_promising_mechanisms": [], "over_explored_backend_fingerprints": [], "under_explored_backend_fingerprints": []})
+    monkeypatch.setattr(proposal_module, "read_policy", lambda memory_dir: {"selection_mode": "balanced", "summary": ""})
+    monkeypatch.setattr(proposal_module, "read_budget", lambda memory_dir: {"exploration_mode": "balanced", "mechanism_budgets": []})
+    monkeypatch.setattr(proposal_module, "read_diversity", lambda memory_dir: {"novelty_step_recommended": False})
+    monkeypatch.setattr(proposal_module, "read_external_review", lambda memory_dir: {"status": "idle", "review_requested": False})
+    monkeypatch.setattr(proposal_module, "synthesize_parent_candidates", lambda candidates_dir: {"top_parent_id": "cand_0001", "ranked_parents": [{"candidate_id": "cand_0001"}]})
+
+    draft = proposal_module.draft_proposal_for_candidate(candidates_dir, "cand_0002")
+
+    assert draft.target["harness_component"] == "science_model"
+    assert draft.memory_context["mutation_brief_target"] == "science_model"
+    assert any(change["kind"] == "mutation_brief_focus" for change in draft.changes)

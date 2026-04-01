@@ -22,6 +22,9 @@ from harness_lab.synthesis import synthesize_parent_candidates
 from harness_lab.workspace import create_candidate_workspace, write_json
 
 
+ALLOWED_BACKEND_MODULES = {"science_model", "science_loss", "science_eval", "science_config", "science_train"}
+
+
 @dataclass(frozen=True)
 class DraftProposal:
     candidate_id: str
@@ -455,14 +458,31 @@ def _llm_proposal_prompt(
     )
 
 
+def _mutation_brief_target_module(memory_dir: Path) -> str:
+    brief = read_json(memory_dir / "mutation_brief.json")
+    target_module = str(brief.get("target_module", "")).strip()
+    return target_module if target_module in ALLOWED_BACKEND_MODULES else ""
+
+
+def _mutation_brief_change_items(target_module: str) -> tuple[dict, ...]:
+    if not target_module:
+        return ()
+    return (
+        {
+            "kind": "mutation_brief_focus",
+            "mechanism": target_module,
+            "summary": f"Follow the current mutation brief by focusing this proposal on {target_module}.",
+        },
+    )
+
+
 def _normalize_backend_levers(payload: dict) -> dict:
     if not isinstance(payload, dict):
         return {}
-    allowed_modules = {"science_model", "science_loss", "science_eval", "science_config", "science_train"}
     normalized: dict[str, dict[str, float | int]] = {}
     for module_name, lever_map in payload.items():
         module_key = str(module_name).strip()
-        if module_key not in allowed_modules or not isinstance(lever_map, dict):
+        if module_key not in ALLOWED_BACKEND_MODULES or not isinstance(lever_map, dict):
             continue
         clean: dict[str, float | int] = {}
         for lever_name, value in lever_map.items():
@@ -587,16 +607,18 @@ def draft_proposal_for_candidate(
     )
     bootstrap_snapshot = read_json(bootstrap_path)
     decision_bundle = read_json(decision_bundle_path)
+    mutation_brief_target = _mutation_brief_target_module(memory_dir)
 
     if chosen_parent is None:
-        mechanism = "initial_harness"
+        mechanism = mutation_brief_target or "initial_harness"
         rationale = (
             f"Initial real backend candidate on dataset {dataset_id}."
             if dataset_id
             else "Initial real backend candidate with no prior parent available."
         )
         changes = (
-            _policy_change_items(policy, mechanism)
+            _mutation_brief_change_items(mutation_brief_target)
+            + _policy_change_items(policy, mechanism)
             + _budget_change_items(budget, mechanism)
             + _external_review_change_items(external_review)
             + _hardware_guardrail_items(hardware_profile)
@@ -650,6 +672,7 @@ def draft_proposal_for_candidate(
                 "bootstrap_snapshot_path": str(bootstrap_path.relative_to(candidate_root)),
                 "decision_bundle_path": str(decision_bundle_path.relative_to(candidate_root)),
                 "branching_mode": "genesis",
+                "mutation_brief_target": mutation_brief_target,
             },
         )
         write_json(candidate_root / "proposal.json", draft.to_dict())
@@ -670,7 +693,8 @@ def draft_proposal_for_candidate(
     latest_summary = index.get("candidates", [])[-1] if index.get("candidates") else {}
     latest_mechanism = str(latest_summary.get("diagnosis_mechanism") or latest_summary.get("harness_component") or "").strip()
     changes = (
-        _proposal_change_items(parent_diagnosis, parent_summary)
+        _mutation_brief_change_items(mutation_brief_target)
+        + _proposal_change_items(parent_diagnosis, parent_summary)
         + _hindsight_change_items(hindsight, mechanism)
         + _policy_change_items(policy, mechanism)
         + _budget_change_items(budget, mechanism)
@@ -688,7 +712,7 @@ def draft_proposal_for_candidate(
     elif branching_mode == "focus_promising":
         rationale = f"{rationale} Budget says to stay close to the most promising active line."
     target = {
-        "harness_component": mechanism or str(parent_summary.get("harness_component", "")).strip(),
+        "harness_component": mutation_brief_target or mechanism or str(parent_summary.get("harness_component", "")).strip(),
         "expected_failure_mode": failure_modes[0] if failure_modes else str(parent_summary.get("expected_failure_mode", "")).strip(),
         "novelty_basis": _novelty_basis_from_memory(index, parent_summary, parent_diagnosis),
     }
@@ -742,6 +766,7 @@ def draft_proposal_for_candidate(
             "decision_bundle_path": str(decision_bundle_path.relative_to(candidate_root)),
             "branching_mode": branching_mode,
             "parent_selection": synthesis.get("ranked_parents", [])[:3],
+            "mutation_brief_target": mutation_brief_target,
         },
     )
 
