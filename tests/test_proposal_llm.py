@@ -120,6 +120,7 @@ def test_llm_proposal_can_author_draft(tmp_path, monkeypatch):
     assert draft.llm_backend_lever_retry_used is False
     assert "backend_lever_catalog" in seen["prompt"]
     assert "returning empty backend_levers is discouraged" in seen["prompt"]
+    assert "Prefer one or two small coordinated lever moves" in seen["prompt"]
     assert "Good examples" in seen["prompt"]
 
 
@@ -306,6 +307,8 @@ def test_llm_retries_when_targeted_module_has_empty_levers_without_reason(tmp_pa
     assert draft.no_lever_reason == ""
     assert draft.llm_backend_lever_retry_used is True
     assert len(seen_prompts) == 2
+    assert "Choose one or two small coordinated lever moves" in seen_prompts[-1]
+    assert "Prefer a paired move when two nearby levers naturally work together" in seen_prompts[-1]
     assert "Do not leave both `backend_levers` and `no_lever_reason` empty." in seen_prompts[-1]
 
 

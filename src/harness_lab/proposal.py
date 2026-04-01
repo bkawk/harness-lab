@@ -481,7 +481,8 @@ def _llm_proposal_prompt(
         "no_lever_reason is optional, but if target.harness_component is one of those backend modules and backend_levers is empty, provide a short evidence-based reason.\n"
         "When the proposal targets one of those backend modules, prefer using backend_levers over vague prose changes.\n"
         "If target.harness_component is one of those backend modules, returning empty backend_levers is discouraged.\n"
-        "Prefer at least one small conservative lever move for the target module unless there is a strong evidence-based reason to avoid it.\n"
+        "Prefer one or two small coordinated lever moves for the target module when they naturally belong together, unless there is a strong evidence-based reason to avoid explicit lever changes.\n"
+        "Do not default to a single lever if a paired move would make the intended experiment clearer or more testable.\n"
         "Only choose lever names and ranges that appear in the supplied backend_lever_catalog.\n"
         "If the mutation brief says wait, keep the move small: use at most two conservative lever nudges for the target module.\n"
         "When waiting, prefer defaults or nearby heuristic choices over aggressive jumps, and do not set levers for non-target modules.\n"
@@ -621,8 +622,9 @@ def _has_good_no_lever_reason(no_lever_reason: str) -> bool:
 def _llm_lever_retry_prompt(*, target_module: str) -> str:
     return (
         f"You targeted `{target_module}` but returned empty backend_levers.\n"
-        "Choose one small conservative lever move for that target module using only the supplied catalog, "
+        "Choose one or two small coordinated lever moves for that target module using only the supplied catalog, "
         "or return a concrete evidence-based `no_lever_reason` explaining why even a small bounded nudge is unsafe or unhelpful right now.\n"
+        "Prefer a paired move when two nearby levers naturally work together for the stated hypothesis.\n"
         "Do not leave both `backend_levers` and `no_lever_reason` empty."
     )
 
