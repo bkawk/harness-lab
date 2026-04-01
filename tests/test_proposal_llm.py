@@ -200,3 +200,51 @@ def test_wait_gate_allows_small_targeted_lever_nudges(tmp_path, monkeypatch):
     draft = proposal_module.draft_proposal_for_candidate(candidates_dir, 'cand_0002')
 
     assert draft.backend_levers == {'science_model': {'hidden_dim': 160, 'k_neighbors': 10}}
+
+
+def test_llm_prompt_suppresses_conflicting_broaden_signals_for_target_module(tmp_path, monkeypatch):
+    candidates_dir, memory_dir = _seed_parent(tmp_path)
+    write_json(
+        memory_dir / "mutation_brief.json",
+        {
+            "recommended_action": "wait",
+            "target_module": "science_model",
+            "summary": "wait",
+        },
+    )
+    monkeypatch.setenv("HARNESS_LAB_LLM_PROPOSAL_ENABLED", "1")
+    monkeypatch.setattr(proposal_module, "choose_best_prepared_dataset", lambda memory_dir: {"dataset_id": "abc_boundary512_v64"})
+    monkeypatch.setattr(proposal_module, "get_dataset_record", lambda memory_dir, dataset_id: {"dataset_id": dataset_id, "status": "ready"})
+    monkeypatch.setattr(proposal_module, "read_hardware_profile", lambda memory_dir: {})
+    monkeypatch.setattr(proposal_module, "read_hindsight", lambda memory_dir: {"summary": "", "policy_adjustments": [], "over_explored_mechanisms": [], "under_explored_promising_mechanisms": [], "over_explored_backend_fingerprints": [], "under_explored_backend_fingerprints": []})
+    monkeypatch.setattr(proposal_module, "read_policy", lambda memory_dir: {"selection_mode": "balanced", "summary": ""})
+    monkeypatch.setattr(
+        proposal_module,
+        "read_budget",
+        lambda memory_dir: {
+            "exploration_mode": "force_broad_exploration",
+            "mechanism_budgets": [{"mechanism": "transfer_guard", "exhausted": True, "remaining_followups": 0}],
+        },
+    )
+    monkeypatch.setattr(proposal_module, "read_diversity", lambda memory_dir: {"novelty_step_recommended": True, "current_mechanism_streak": 6})
+    monkeypatch.setattr(proposal_module, "read_external_review", lambda memory_dir: {"status": "idle", "review_requested": False})
+    monkeypatch.setattr(proposal_module, "synthesize_parent_candidates", lambda candidates_dir: {"top_parent_id": "cand_0001", "ranked_parents": [{"candidate_id": "cand_0001"}]})
+    seen = {}
+
+    def fake_run(prompt, *, cwd):
+        seen["prompt"] = prompt
+        return {
+            "rationale": "Try a small science_model lever nudge.",
+            "target": {"harness_component": "science_model", "expected_failure_mode": "audit_blocked", "novelty_basis": "small lever move"},
+            "changes": [{"kind": "llm_priority", "mechanism": "science_model", "summary": "Use a small model lever nudge."}],
+            "backend_levers": {"science_model": {"hidden_dim": 160}},
+        }
+
+    monkeypatch.setattr(proposal_module, "run_claude_json", fake_run)
+
+    draft = proposal_module.draft_proposal_for_candidate(candidates_dir, "cand_0002")
+
+    assert draft.backend_levers == {"science_model": {"hidden_dim": 160}}
+    assert "force broader exploration" not in seen["prompt"]
+    assert "novelty step" not in seen["prompt"]
+    assert "science_model" in seen["prompt"]

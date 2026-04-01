@@ -407,6 +407,29 @@ def _branching_mode_change_items(branching_mode: str, chosen_mechanism: str, lat
     return ()
 
 
+def _llm_fallback_changes(fallback_changes: tuple[dict, ...], mutation_brief: dict) -> tuple[dict, ...]:
+    target_module = str(mutation_brief.get("target_module", "")).strip()
+    if target_module not in ALLOWED_BACKEND_MODULES:
+        return fallback_changes
+    suppressed_kinds = {
+        "budget_guardrail",
+        "budget_exploration_mode",
+        "diversity_novelty_step",
+        "diversity_warning",
+        "exploration_jump",
+    }
+    filtered: list[dict] = []
+    for item in fallback_changes:
+        kind = str(item.get("kind", "")).strip()
+        mechanism = str(item.get("mechanism", "")).strip()
+        if kind in suppressed_kinds and mechanism not in {"", target_module}:
+            continue
+        if kind in suppressed_kinds:
+            continue
+        filtered.append(item)
+    return tuple(filtered)
+
+
 def _llm_proposal_prompt(
     *,
     bootstrap_snapshot: dict,
@@ -441,7 +464,7 @@ def _llm_proposal_prompt(
         "fallback_draft": {
             "rationale": fallback_rationale,
             "target": fallback_target,
-            "changes": list(fallback_changes),
+            "changes": list(_llm_fallback_changes(fallback_changes, mutation_brief)),
         },
     }
     return (
