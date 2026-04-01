@@ -8,13 +8,13 @@
 - Improve transfer-stability evaluation or smoke tests so promising candidates fail earlier before full audit.
 
 ## Why This Module
-- Recent backend edits are concentrated in `science_model` with average transfer gap 0.035948. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation.
+- Recent backend edits are concentrated in `science_model` with average transfer gap 0.035630. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation.
 
 ## Secondary Context
-- Recent real-backend runs are only using about 681.6 MB on average, leaving most VRAM unused. 3 scored candidate(s) have landed since structural commit `23dc0ec`.
+- Recent real-backend runs are only using about 645.6 MB on average, leaving most VRAM unused. 4 scored candidate(s) have landed since structural commit `23dc0ec`.
 
 ## Options
-- [Recommended] Mutate science_model: Recent backend edits are concentrated in `science_model` with average transfer gap 0.035948. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation.
+- [Recommended] Mutate science_model: Recent backend edits are concentrated in `science_model` with average transfer gap 0.035630. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation.
 - [Option] Wait on broad mutation: Recent evidence may still be too thin or too noisy for broad mutation, but conservative lever nudges are still allowed while more scored candidates accumulate.
 
 ## Evidence
