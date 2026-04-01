@@ -21,7 +21,28 @@ def next_change_markdown_path(repo_dir: Path) -> Path:
     return repo_dir / "docs" / "next_change.md"
 
 
-def _pick_target_module(memory_dir: Path) -> tuple[str, str]:
+def _failure_mode_target(hindsight: dict, top_request: dict) -> tuple[str, str] | None:
+    recent_failures = [
+        str(item.get("label", "")).strip()
+        for item in hindsight.get("recent_top_failure_modes", [])
+        if str(item.get("label", "")).strip()
+    ]
+    top_request_kind = str(top_request.get("kind", "")).strip()
+    if any(label in {"boundary_transfer_weak", "boundary_smoke:gap_too_wide", "audit_boundary_f1_weak"} for label in recent_failures):
+        return "science_loss", "Recent failures are boundary-transfer specific, so the loss surface is the best next bounded module to adjust."
+    if any(label in {"transfer_smoke:gap_too_wide", "transfer_smoke_score_below_floor", "hard_transfer_smoke:gap_too_wide"} for label in recent_failures):
+        return "science_eval", "Recent failures are dominated by smoke-gate transfer checks, so the evaluation module is the best next bounded target."
+    if any(label in {"transfer_collapse", "transfer_regression", "hard_transfer_regression", "local_only_gain"} for label in recent_failures):
+        return "science_model", "Recent failures point to transfer behavior that likely depends on model capacity and representation quality."
+    if top_request_kind == "vram_headroom":
+        return "science_model", "The top live pressure is unused VRAM headroom, so a bounded model-capacity move is the best next target."
+    return None
+
+
+def _pick_target_module(memory_dir: Path, hindsight: dict, top_request: dict) -> tuple[str, str]:
+    failure_target = _failure_mode_target(hindsight, top_request)
+    if failure_target is not None:
+        return failure_target
     module_summary = read_json(memory_dir / "backend_module_summary.json") if (memory_dir / "backend_module_summary.json").exists() else {}
     modules = list(module_summary.get("modules", []))
     if not modules:
@@ -137,7 +158,7 @@ def build_mutation_brief(candidates_dir: Path, memory_dir: Path) -> dict:
     backend_module_summary = read_json(memory_dir / "backend_module_summary.json") if (memory_dir / "backend_module_summary.json").exists() else {}
 
     top_request = next(iter(human_feedback.get("items", [])), {})
-    target_module, module_rationale = _pick_target_module(memory_dir)
+    target_module, module_rationale = _pick_target_module(memory_dir, hindsight, top_request)
     likely_issue = str(science_debug.get("likely_issue", "")).strip()
     problem_statement = _build_problem_statement(top_request, hindsight)
     module_rationale = _build_module_rationale(module_rationale, likely_issue)
