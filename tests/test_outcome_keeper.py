@@ -117,3 +117,24 @@ class TestValidateKeeperCandidate:
         )
         result = validate_keeper_candidate(candidates_dir, "cand_0001")
         assert result["approved"] is True
+
+    def test_approved_bounded_lever_candidate_even_with_large_snapshot_diff(self, tmp_path):
+        candidates_dir = _setup_keeper(tmp_path, changed_files=MAX_KEEPER_CHANGED_FILES + 9)
+        proposal_path = candidates_dir / "cand_0001" / "proposal.json"
+        proposal = json.loads(proposal_path.read_text())
+        proposal["changes"] = [
+            {
+                "kind": "backend_lever",
+                "mechanism": "science_train",
+                "summary": "Increase batch size conservatively.",
+            }
+        ]
+        proposal["backend_levers"] = {"science_train": {"batch_size": 3, "eval_batch_size": 3}}
+        write_json(proposal_path, proposal)
+
+        result = validate_keeper_candidate(candidates_dir, "cand_0001")
+
+        assert result["approved"] is True
+        bounded = next(check for check in result["checks"] if check["check"] == "bounded_changes")
+        assert bounded["passed"] is True
+        assert "lever_based_candidate" in bounded["detail"]
