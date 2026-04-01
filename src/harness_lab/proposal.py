@@ -452,8 +452,13 @@ def _llm_proposal_prompt(
         "backend_levers is optional. If present, it must be an object keyed by module name from: science_model, science_loss, science_eval, science_config, science_train.\n"
         "Each module value must be an object of scalar numeric lever values only.\n"
         "When the proposal targets one of those backend modules, prefer using backend_levers over vague prose changes.\n"
+        "If target.harness_component is one of those backend modules, returning empty backend_levers is discouraged.\n"
+        "Prefer at least one small conservative lever move for the target module unless there is a strong evidence-based reason to avoid it.\n"
         "Only choose lever names and ranges that appear in the supplied backend_lever_catalog.\n"
-        "If the evidence is still too thin or the mutation brief says wait, leave backend_levers empty.\n"
+        "If the mutation brief says wait, keep the move small: use at most two conservative lever nudges for the target module.\n"
+        "When waiting, prefer defaults or nearby heuristic choices over aggressive jumps, and do not set levers for non-target modules.\n"
+        "Good examples: science_model -> {hidden_dim: 160}; science_model -> {k_neighbors: 10}; science_eval -> {transfer_smoke_max_gap: 0.025}.\n"
+        "Bad examples: setting many levers at once, changing non-target modules, or making large jumps far outside nearby defaults and choices.\n"
         "Keep the proposal concrete, short, and grounded in the supplied evidence.\n"
         "Do not mutate files or mention implementation details outside the proposal JSON.\n\n"
         f"{json.dumps(payload, indent=2, sort_keys=True)}"
@@ -461,7 +466,10 @@ def _llm_proposal_prompt(
 
 
 def _mutation_brief_state(memory_dir: Path) -> dict:
-    brief = read_json(memory_dir / "mutation_brief.json")
+    brief_path = memory_dir / "mutation_brief.json"
+    if not brief_path.exists():
+        return {}
+    brief = read_json(brief_path)
     if not isinstance(brief, dict):
         return {}
     target_module = str(brief.get("target_module", "")).strip()

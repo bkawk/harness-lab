@@ -151,11 +151,16 @@ def build_mutation_brief(candidates_dir: Path, memory_dir: Path) -> dict:
         else "The last structural change could not be identified, so recent-signal gating is conservative."
     )
     if not enough_recent_signal:
-        module_rationale = f"{module_rationale} Hold off on a mutation until the post-change sample is less thin. {scored_since_change_note}"
+        module_rationale = (
+            f"{module_rationale} Hold off on broad mutation until the post-change sample is less thin. "
+            f"Small conservative lever nudges are still allowed. {scored_since_change_note}"
+        )
     wait_reason = (
-        f"Only {len(scored_since_change)} scored candidate(s) have landed since the last structural change; wait until at least {min_scored_candidates_after_change} post-change scored candidates exist."
+        f"Only {len(scored_since_change)} scored candidate(s) have landed since the last structural change; "
+        f"wait on broad mutation until at least {min_scored_candidates_after_change} post-change scored candidates exist, "
+        "but conservative lever nudges are still allowed."
         if last_structural_commit and not enough_recent_signal
-        else "Recent evidence may still be too thin or too noisy; a few more scored candidates could produce a cleaner signal."
+        else "Recent evidence may still be too thin or too noisy for broad mutation, but conservative lever nudges are still allowed while more scored candidates accumulate."
     )
 
     supporting_evidence = [str(item) for item in top_request.get("evidence", [])[:5]]
@@ -169,7 +174,7 @@ def build_mutation_brief(candidates_dir: Path, memory_dir: Path) -> dict:
         "summary": (
             f"Current priority is `{str(top_request.get('kind', '') or 'unknown')}` with selection mode `{policy.get('selection_mode', '') or 'unknown'}`."
             if enough_recent_signal
-            else f"Current priority is `{str(top_request.get('kind', '') or 'unknown')}`, but only {len(scored_since_change)} scored candidate(s) have landed since the last structural change."
+            else f"Current priority is `{str(top_request.get('kind', '') or 'unknown')}`, but only {len(scored_since_change)} scored candidate(s) have landed since the last structural change, so broad mutation should wait while conservative lever nudges remain allowed."
         ),
         "recommended_action": "targeted_mutation" if enough_recent_signal else "wait",
         "target_module": target_module,
@@ -212,7 +217,7 @@ def build_mutation_brief(candidates_dir: Path, memory_dir: Path) -> dict:
             },
             {
                 "kind": "wait",
-                "title": "Wait for more data",
+                "title": "Wait on broad mutation",
                 "recommended": not enough_recent_signal,
                 "why": wait_reason,
             },
