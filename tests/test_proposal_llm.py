@@ -117,6 +117,8 @@ def test_llm_proposal_can_author_draft(tmp_path, monkeypatch):
     assert draft.backend_levers["science_model"]["hidden_dim"] == 160
     assert draft.backend_levers["science_eval"]["transfer_smoke_max_gap"] == 0.025
     assert "backend_lever_catalog" in seen["prompt"]
+    assert "returning empty backend_levers is discouraged" in seen["prompt"]
+    assert "Good examples" in seen["prompt"]
 
 
 def test_invalid_llm_proposal_falls_back_to_heuristic(tmp_path, monkeypatch):
