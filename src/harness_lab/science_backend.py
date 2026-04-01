@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import time
+from dataclasses import asdict
 from pathlib import Path
 
 import torch
@@ -49,6 +50,10 @@ def run_science_backend(
     cfg = derive_config(candidate_id, proposal, diagnosis)
     (trace_dir / "backend_levers.json").write_text(
         json.dumps(proposal.get("backend_levers", {}), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    (trace_dir / "effective_backend_config.json").write_text(
+        json.dumps(asdict(cfg), indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
     metadata = load_metadata(dataset_root)

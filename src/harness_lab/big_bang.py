@@ -142,14 +142,18 @@ def render_big_bang_markdown(
             live_command = json.loads(live_command_path.read_text(encoding="utf-8"))
     lever_candidate_id = active_candidate_id or str(state.get("last_candidate_id", "") or "")
     lever_payload = {}
+    effective_lever_payload = {}
     if lever_candidate_id:
         candidate_root = candidates_dir / lever_candidate_id
         trace_lever_path = candidate_root / "traces" / "backend_levers.json"
+        effective_config_path = candidate_root / "traces" / "effective_backend_config.json"
         proposal_path = candidate_root / "proposal.json"
         if trace_lever_path.exists():
             lever_payload = json.loads(trace_lever_path.read_text(encoding="utf-8"))
         elif proposal_path.exists():
             lever_payload = json.loads(proposal_path.read_text(encoding="utf-8")).get("backend_levers", {})
+        if effective_config_path.exists():
+            effective_lever_payload = json.loads(effective_config_path.read_text(encoding="utf-8"))
     external_lab_lines = [
         f"- lab advice: `{str(item.get('summary', '')).strip()}`"
         for item in external_review.get("lab_advice", [])[:3]
@@ -224,6 +228,25 @@ def render_big_bang_markdown(
             chosen_lever_lines.append(f"- {label}: `{assignments}`")
     if len(chosen_lever_lines) == 1:
         chosen_lever_lines.append("- no explicit lever values chosen yet")
+    effective_field_groups = {
+        "science_model": ("hidden_dim", "global_dim", "instance_dim", "k_neighbors", "instance_modulation_scale"),
+        "science_loss": ("param_loss_weight", "boundary_loss_weight", "instance_loss_weight", "instance_margin"),
+        "science_eval": ("transfer_smoke_min_score", "transfer_smoke_max_gap", "transfer_smoke_min_boundary_f1"),
+        "science_config": ("lr", "weight_decay", "time_budget_seconds", "eval_reserve_seconds"),
+        "science_train": ("batch_size", "eval_batch_size", "grad_clip", "log_interval"),
+    }
+    effective_lever_lines = [f"- source_candidate: `{lever_candidate_id or '-'}`"]
+    for module_name, label in backend_levers:
+        field_names = effective_field_groups.get(module_name, ())
+        assignments = [
+            f"{field}={effective_lever_payload[field]}"
+            for field in field_names
+            if isinstance(effective_lever_payload, dict) and field in effective_lever_payload
+        ]
+        if assignments:
+            effective_lever_lines.append(f"- {label}: `{', '.join(assignments)}`")
+    if len(effective_lever_lines) == 1:
+        effective_lever_lines.append("- no effective backend settings recorded yet")
 
     recent = list(index.get("candidates", []))[-5:]
     recent_lines = []
@@ -354,6 +377,9 @@ def render_big_bang_markdown(
             *backend_science_lines,
             "### Chosen Lever Values",
             *chosen_lever_lines,
+            "",
+            "### Effective Backend Settings",
+            *effective_lever_lines,
             "",
             "### Modular Levers",
             *backend_lever_lines,
