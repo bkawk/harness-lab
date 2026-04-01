@@ -8,6 +8,10 @@ def test_mutation_brief_waits_when_post_change_sample_is_thin(tmp_path, monkeypa
     memory_dir.mkdir(parents=True)
     candidates_dir.mkdir(parents=True)
     monkeypatch.setattr("harness_lab.mutation_brief._last_structural_commit", lambda repo_dir: "abc123")
+    monkeypatch.setattr(
+        "harness_lab.mutation_brief._commit_timestamp",
+        lambda repo_dir, commit_sha: __import__("datetime").datetime(2026, 4, 1, 0, 0, tzinfo=__import__("datetime").timezone.utc),
+    )
     write_json(memory_dir / "human_feedback.json", {"items": [{"kind": "evaluation", "summary": "Improve transfer checks.", "evidence": ["artifacts/memory/hindsight.json"], "priority": 12}], "summary": "x"})
     write_json(memory_dir / "hindsight.json", {"summary": "Repeated audit-blocked outcomes."})
     write_json(memory_dir / "policy.json", {"selection_mode": "stabilize", "summary": "Favor transfer stability."})
@@ -20,8 +24,8 @@ def test_mutation_brief_waits_when_post_change_sample_is_thin(tmp_path, monkeypa
         memory_dir / "candidate_index.json",
         {
             "candidates": [
-                {"candidate_id": "cand_0001", "source_commit": "abc123", "benchmark_score": 0.3, "audit_score": 0.27},
-                {"candidate_id": "cand_0002", "source_commit": "older", "benchmark_score": 0.31, "audit_score": 0.28},
+                {"candidate_id": "cand_0001", "created_at": "2026-04-01T00:10:00+00:00", "benchmark_score": 0.3, "audit_score": 0.27},
+                {"candidate_id": "cand_0002", "created_at": "2026-03-31T23:50:00+00:00", "benchmark_score": 0.31, "audit_score": 0.28},
             ]
         },
     )
@@ -75,6 +79,10 @@ def test_mutation_brief_recommends_mutation_after_enough_post_change_signal(tmp_
     memory_dir.mkdir(parents=True)
     candidates_dir.mkdir(parents=True)
     monkeypatch.setattr("harness_lab.mutation_brief._last_structural_commit", lambda repo_dir: "abc123")
+    monkeypatch.setattr(
+        "harness_lab.mutation_brief._commit_timestamp",
+        lambda repo_dir, commit_sha: __import__("datetime").datetime(2026, 4, 1, 0, 0, tzinfo=__import__("datetime").timezone.utc),
+    )
     write_json(memory_dir / "human_feedback.json", {"items": [{"kind": "evaluation", "summary": "Improve transfer checks.", "priority": 12}], "summary": "x"})
     write_json(memory_dir / "hindsight.json", {"summary": "Repeated audit-blocked outcomes."})
     write_json(memory_dir / "policy.json", {"selection_mode": "stabilize", "summary": "Favor transfer stability."})
@@ -87,11 +95,9 @@ def test_mutation_brief_recommends_mutation_after_enough_post_change_signal(tmp_
         memory_dir / "candidate_index.json",
         {
             "candidates": [
-                {"candidate_id": "cand_0001", "source_commit": "abc123", "benchmark_score": 0.3, "audit_score": 0.27},
-                {"candidate_id": "cand_0002", "source_commit": "abc123", "benchmark_score": 0.31, "audit_score": 0.28},
-                {"candidate_id": "cand_0003", "source_commit": "abc123", "benchmark_score": 0.29, "audit_score": 0.26},
-                {"candidate_id": "cand_0004", "source_commit": "abc123", "benchmark_score": 0.32, "audit_score": 0.29},
-                {"candidate_id": "cand_0005", "source_commit": "abc123", "benchmark_score": 0.33, "audit_score": 0.3},
+                {"candidate_id": "cand_0001", "created_at": "2026-04-01T00:01:00+00:00", "benchmark_score": 0.3, "audit_score": 0.27},
+                {"candidate_id": "cand_0002", "created_at": "2026-04-01T00:02:00+00:00", "benchmark_score": 0.31, "audit_score": 0.28},
+                {"candidate_id": "cand_0003", "created_at": "2026-04-01T00:03:00+00:00", "benchmark_score": 0.29, "audit_score": 0.26},
             ]
         },
     )

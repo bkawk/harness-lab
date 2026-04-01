@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
 
 from harness_lab.backend import read_backend_profile
@@ -76,9 +77,34 @@ def _last_structural_commit(repo_dir: Path) -> str:
     return ""
 
 
-def _scored_candidates_since_commit(memory_dir: Path, commit_sha: str) -> list[dict]:
+def _commit_timestamp(repo_dir: Path, commit_sha: str) -> datetime | None:
+    if not commit_sha:
+        return None
+    try:
+        result = subprocess.run(
+            ["git", "show", "-s", "--format=%cI", commit_sha],
+            cwd=repo_dir,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except Exception:
+        return None
+    text = result.stdout.strip()
+    if not text:
+        return None
+    try:
+        return datetime.fromisoformat(text.replace("Z", "+00:00")).astimezone(timezone.utc)
+    except ValueError:
+        return None
+
+
+def _scored_candidates_since_commit(memory_dir: Path, commit_sha: str, *, repo_dir: Path) -> list[dict]:
     index_path = memory_dir / "candidate_index.json"
     if not commit_sha or not index_path.exists():
+        return []
+    commit_time = _commit_timestamp(repo_dir, commit_sha)
+    if commit_time is None:
         return []
     index = read_json(index_path)
     items: list[dict] = []
@@ -87,14 +113,20 @@ def _scored_candidates_since_commit(memory_dir: Path, commit_sha: str) -> list[d
         audit = candidate.get("audit_score")
         if benchmark is None and audit is None:
             continue
-        source_commit = str(candidate.get("source_commit", "")).strip()
-        if source_commit == commit_sha:
+        created_at = str(candidate.get("created_at", "")).strip()
+        if not created_at:
+            continue
+        try:
+            created_time = datetime.fromisoformat(created_at.replace("Z", "+00:00")).astimezone(timezone.utc)
+        except ValueError:
+            continue
+        if created_time > commit_time:
             items.append(candidate)
     return items
 
 
 def build_mutation_brief(candidates_dir: Path, memory_dir: Path) -> dict:
-    min_scored_candidates_after_change = 5
+    min_scored_candidates_after_change = 3
     human_feedback = read_human_feedback(memory_dir)
     hindsight = read_hindsight(memory_dir)
     policy = read_policy(memory_dir)
@@ -111,7 +143,7 @@ def build_mutation_brief(candidates_dir: Path, memory_dir: Path) -> dict:
     module_rationale = _build_module_rationale(module_rationale, likely_issue)
     repo_dir = memory_dir.parent.parent
     last_structural_commit = _last_structural_commit(repo_dir)
-    scored_since_change = _scored_candidates_since_commit(memory_dir, last_structural_commit)
+    scored_since_change = _scored_candidates_since_commit(memory_dir, last_structural_commit, repo_dir=repo_dir)
     enough_recent_signal = len(scored_since_change) >= min_scored_candidates_after_change
     scored_since_change_note = (
         f"{len(scored_since_change)} scored candidate(s) have landed since structural commit `{last_structural_commit[:7]}`."
