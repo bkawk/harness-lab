@@ -178,6 +178,8 @@ def build_mutation_brief(candidates_dir: Path, memory_dir: Path) -> dict:
         ),
         "recommended_action": "targeted_mutation" if enough_recent_signal else "wait",
         "target_module": target_module,
+        "last_structural_commit": last_structural_commit,
+        "scored_candidates_since_change": len(scored_since_change),
         "problem_statement": problem_statement,
         "module_rationale": module_rationale,
         "science_trend_summary": str(science_summary.get("trend_summary", "")).strip(),

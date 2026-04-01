@@ -34,6 +34,8 @@ def test_mutation_brief_waits_when_post_change_sample_is_thin(tmp_path, monkeypa
 
     assert payload["target_module"] == "science_eval"
     assert payload["recommended_action"] == "wait"
+    assert payload["last_structural_commit"] == "abc123"
+    assert payload["scored_candidates_since_change"] == 1
     assert payload["problem_statement"] == "Improve transfer checks."
     assert "VRAM headroom is present" in payload["module_rationale"]
     assert "only 1 scored candidate" in payload["summary"].lower()
@@ -105,5 +107,7 @@ def test_mutation_brief_recommends_mutation_after_enough_post_change_signal(tmp_
     payload = build_mutation_brief(candidates_dir, memory_dir)
 
     assert payload["recommended_action"] == "targeted_mutation"
+    assert payload["last_structural_commit"] == "abc123"
+    assert payload["scored_candidates_since_change"] == 3
     assert payload["options"][0]["recommended"] is True
     assert payload["options"][1]["recommended"] is False
