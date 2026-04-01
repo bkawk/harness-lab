@@ -64,3 +64,22 @@ def test_derive_config_strengthens_boundary_transfer_seed_defaults():
     assert cfg.boundary_loss_weight >= 0.12
     assert cfg.instance_loss_weight >= 0.06
     assert cfg.k_neighbors >= 8
+
+
+def test_derive_config_strengthens_hard_transfer_seed_defaults():
+    cfg = derive_config(
+        "cand_0102",
+        {
+            "target": {
+                "harness_component": "science_loss",
+                "expected_failure_mode": "hard_transfer_regression",
+            },
+            "changes": [],
+        },
+        {},
+    )
+
+    assert cfg.boundary_loss_weight >= 0.12
+    assert cfg.instance_loss_weight >= 0.06
+    assert cfg.instance_margin >= 0.38
+    assert cfg.k_neighbors >= 8

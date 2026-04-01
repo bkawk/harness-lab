@@ -139,6 +139,7 @@ def derive_config(candidate_id: str, proposal: dict, diagnosis: dict) -> Science
     expected_failure = str(proposal.get("target", {}).get("expected_failure_mode", "")).strip().lower()
     change_kinds = {str(item.get("kind", "")).strip().lower() for item in proposal.get("changes", [])}
     boundary_expected = "boundary" in expected_failure
+    hard_transfer_expected = "hard_transfer" in expected_failure
 
     if "transfer" in expected_failure or "audit" in expected_failure or "transfer" in mechanism or boundary_expected:
         transfer_updates = {
@@ -146,7 +147,12 @@ def derive_config(candidate_id: str, proposal: dict, diagnosis: dict) -> Science
             "lr": min(cfg.lr, 2.5e-4),
             "weight_decay": 2e-4,
         }
-        if boundary_expected:
+        if hard_transfer_expected:
+            transfer_updates["boundary_loss_weight"] = max(cfg.boundary_loss_weight, 0.12)
+            transfer_updates["instance_loss_weight"] = max(cfg.instance_loss_weight, 0.06)
+            transfer_updates["instance_margin"] = max(cfg.instance_margin, 0.38)
+            transfer_updates["k_neighbors"] = max(cfg.k_neighbors, 8)
+        elif boundary_expected:
             transfer_updates["boundary_loss_weight"] = max(cfg.boundary_loss_weight, 0.12)
             transfer_updates["instance_loss_weight"] = max(cfg.instance_loss_weight, 0.06)
             transfer_updates["k_neighbors"] = max(cfg.k_neighbors, 8)
