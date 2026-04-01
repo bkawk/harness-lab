@@ -248,3 +248,94 @@ def test_llm_prompt_suppresses_conflicting_broaden_signals_for_target_module(tmp
     assert "force broader exploration" not in seen["prompt"]
     assert "novelty step" not in seen["prompt"]
     assert "science_model" in seen["prompt"]
+
+
+def test_llm_retries_when_targeted_module_has_empty_levers_without_reason(tmp_path, monkeypatch):
+    candidates_dir, memory_dir = _seed_parent(tmp_path)
+    write_json(
+        memory_dir / "mutation_brief.json",
+        {
+            "recommended_action": "targeted_mutation",
+            "target_module": "science_model",
+            "summary": "act",
+        },
+    )
+    monkeypatch.setenv("HARNESS_LAB_LLM_PROPOSAL_ENABLED", "1")
+    monkeypatch.setattr(proposal_module, "choose_best_prepared_dataset", lambda memory_dir: {"dataset_id": "abc_boundary512_v64"})
+    monkeypatch.setattr(proposal_module, "get_dataset_record", lambda memory_dir, dataset_id: {"dataset_id": dataset_id, "status": "ready"})
+    monkeypatch.setattr(proposal_module, "read_hardware_profile", lambda memory_dir: {})
+    monkeypatch.setattr(proposal_module, "read_hindsight", lambda memory_dir: {"summary": "", "policy_adjustments": [], "over_explored_mechanisms": [], "under_explored_promising_mechanisms": [], "over_explored_backend_fingerprints": [], "under_explored_backend_fingerprints": []})
+    monkeypatch.setattr(proposal_module, "read_policy", lambda memory_dir: {"selection_mode": "stabilize", "summary": ""})
+    monkeypatch.setattr(proposal_module, "read_budget", lambda memory_dir: {"exploration_mode": "balanced", "mechanism_budgets": []})
+    monkeypatch.setattr(proposal_module, "read_diversity", lambda memory_dir: {"novelty_step_recommended": False})
+    monkeypatch.setattr(proposal_module, "read_external_review", lambda memory_dir: {"status": "idle", "review_requested": False})
+    monkeypatch.setattr(proposal_module, "synthesize_parent_candidates", lambda candidates_dir: {"top_parent_id": "cand_0001", "ranked_parents": [{"candidate_id": "cand_0001"}]})
+    seen_prompts = []
+    payloads = iter(
+        [
+            {
+                "rationale": "Try a small science_model move.",
+                "target": {"harness_component": "science_model", "expected_failure_mode": "audit_blocked", "novelty_basis": "small lever move"},
+                "changes": [{"kind": "llm_priority", "mechanism": "science_model", "summary": "Try a small model nudge."}],
+                "backend_levers": {},
+            },
+            {
+                "rationale": "Try a small science_model move.",
+                "target": {"harness_component": "science_model", "expected_failure_mode": "audit_blocked", "novelty_basis": "small lever move"},
+                "changes": [{"kind": "llm_priority", "mechanism": "science_model", "summary": "Try a small model nudge."}],
+                "backend_levers": {"science_model": {"hidden_dim": 160}},
+            },
+        ]
+    )
+
+    def fake_run(prompt, *, cwd):
+        seen_prompts.append(prompt)
+        return next(payloads)
+
+    monkeypatch.setattr(proposal_module, "run_claude_json", fake_run)
+
+    draft = proposal_module.draft_proposal_for_candidate(candidates_dir, "cand_0002")
+
+    assert draft.backend_levers == {"science_model": {"hidden_dim": 160}}
+    assert len(seen_prompts) == 2
+    assert "Do not leave both `backend_levers` and `no_lever_reason` empty." in seen_prompts[-1]
+
+
+def test_llm_does_not_retry_when_empty_levers_have_good_reason(tmp_path, monkeypatch):
+    candidates_dir, memory_dir = _seed_parent(tmp_path)
+    write_json(
+        memory_dir / "mutation_brief.json",
+        {
+            "recommended_action": "targeted_mutation",
+            "target_module": "science_model",
+            "summary": "act",
+        },
+    )
+    monkeypatch.setenv("HARNESS_LAB_LLM_PROPOSAL_ENABLED", "1")
+    monkeypatch.setattr(proposal_module, "choose_best_prepared_dataset", lambda memory_dir: {"dataset_id": "abc_boundary512_v64"})
+    monkeypatch.setattr(proposal_module, "get_dataset_record", lambda memory_dir, dataset_id: {"dataset_id": dataset_id, "status": "ready"})
+    monkeypatch.setattr(proposal_module, "read_hardware_profile", lambda memory_dir: {})
+    monkeypatch.setattr(proposal_module, "read_hindsight", lambda memory_dir: {"summary": "", "policy_adjustments": [], "over_explored_mechanisms": [], "under_explored_promising_mechanisms": [], "over_explored_backend_fingerprints": [], "under_explored_backend_fingerprints": []})
+    monkeypatch.setattr(proposal_module, "read_policy", lambda memory_dir: {"selection_mode": "stabilize", "summary": ""})
+    monkeypatch.setattr(proposal_module, "read_budget", lambda memory_dir: {"exploration_mode": "balanced", "mechanism_budgets": []})
+    monkeypatch.setattr(proposal_module, "read_diversity", lambda memory_dir: {"novelty_step_recommended": False})
+    monkeypatch.setattr(proposal_module, "read_external_review", lambda memory_dir: {"status": "idle", "review_requested": False})
+    monkeypatch.setattr(proposal_module, "synthesize_parent_candidates", lambda candidates_dir: {"top_parent_id": "cand_0001", "ranked_parents": [{"candidate_id": "cand_0001"}]})
+    seen_prompts = []
+
+    def fake_run(prompt, *, cwd):
+        seen_prompts.append(prompt)
+        return {
+            "rationale": "Hold steady on explicit levers for one more scored result.",
+            "target": {"harness_component": "science_model", "expected_failure_mode": "audit_blocked", "novelty_basis": "wait for one more scored result"},
+            "changes": [{"kind": "llm_priority", "mechanism": "science_model", "summary": "Hold explicit levers steady for one more scored result."}],
+            "backend_levers": {},
+            "no_lever_reason": "The recent targeted-mutation window is still narrow, so one more scored candidate would make the next explicit lever move less noisy.",
+        }
+
+    monkeypatch.setattr(proposal_module, "run_claude_json", fake_run)
+
+    draft = proposal_module.draft_proposal_for_candidate(candidates_dir, "cand_0002")
+
+    assert draft.backend_levers == {}
+    assert len(seen_prompts) == 1

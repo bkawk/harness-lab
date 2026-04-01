@@ -469,11 +469,12 @@ def _llm_proposal_prompt(
     }
     return (
         "You are authoring a bounded harness-lab proposal.\n"
-        "Return only JSON with keys: rationale, target, changes, backend_levers.\n"
+        "Return only JSON with keys: rationale, target, changes, backend_levers, no_lever_reason.\n"
         "target must be an object with keys: harness_component, expected_failure_mode, novelty_basis.\n"
         "changes must be an array of objects with keys: kind, mechanism, summary.\n"
         "backend_levers is optional. If present, it must be an object keyed by module name from: science_model, science_loss, science_eval, science_config, science_train.\n"
         "Each module value must be an object of scalar numeric lever values only.\n"
+        "no_lever_reason is optional, but if target.harness_component is one of those backend modules and backend_levers is empty, provide a short evidence-based reason.\n"
         "When the proposal targets one of those backend modules, prefer using backend_levers over vague prose changes.\n"
         "If target.harness_component is one of those backend modules, returning empty backend_levers is discouraged.\n"
         "Prefer at least one small conservative lever move for the target module unless there is a strong evidence-based reason to avoid it.\n"
@@ -564,7 +565,7 @@ def _soft_wait_backend_levers(backend_levers: dict, mutation_brief: dict) -> dic
     return {target_module: limited} if limited else {}
 
 
-def _normalize_llm_proposal_payload(payload: dict, fallback_target: dict, fallback_changes: tuple[dict, ...], fallback_rationale: str) -> tuple[str, dict, tuple[dict, ...], dict] | None:
+def _normalize_llm_proposal_payload(payload: dict, fallback_target: dict, fallback_changes: tuple[dict, ...], fallback_rationale: str) -> tuple[str, dict, tuple[dict, ...], dict, str] | None:
     if not isinstance(payload, dict):
         return None
     rationale = str(payload.get("rationale", "")).strip()
@@ -595,7 +596,31 @@ def _normalize_llm_proposal_payload(payload: dict, fallback_target: dict, fallba
     if not changes:
         changes = list(fallback_changes)
     backend_levers = _normalize_backend_levers(payload.get("backend_levers", {}))
-    return rationale, target, tuple(changes[:8]), backend_levers
+    no_lever_reason = str(payload.get("no_lever_reason", "")).strip()
+    return rationale, target, tuple(changes[:8]), backend_levers, no_lever_reason
+
+
+def _targeted_module_without_levers(target: dict, backend_levers: dict) -> str:
+    module_name = str(target.get("harness_component", "")).strip()
+    if module_name not in ALLOWED_BACKEND_MODULES:
+        return ""
+    module_values = backend_levers.get(module_name, {}) if isinstance(backend_levers, dict) else {}
+    if isinstance(module_values, dict) and module_values:
+        return ""
+    return module_name
+
+
+def _has_good_no_lever_reason(no_lever_reason: str) -> bool:
+    return len(no_lever_reason.strip()) >= 24
+
+
+def _llm_lever_retry_prompt(*, target_module: str) -> str:
+    return (
+        f"You targeted `{target_module}` but returned empty backend_levers.\n"
+        "Choose one small conservative lever move for that target module using only the supplied catalog, "
+        "or return a concrete evidence-based `no_lever_reason` explaining why even a small bounded nudge is unsafe or unhelpful right now.\n"
+        "Do not leave both `backend_levers` and `no_lever_reason` empty."
+    )
 
 
 def _maybe_llm_author_proposal(
@@ -632,7 +657,28 @@ def _maybe_llm_author_proposal(
     if not normalized:
         log.warning("proposal: claude fallback to heuristic (payload=%s)", "empty" if not payload else "invalid")
         return fallback_rationale, fallback_target, fallback_changes, fallback_backend_levers
-    rationale, target, changes, backend_levers = normalized
+    rationale, target, changes, backend_levers, no_lever_reason = normalized
+    targeted_module = _targeted_module_without_levers(target, backend_levers)
+    if targeted_module and not _has_good_no_lever_reason(no_lever_reason):
+        retry_payload = run_claude_json(
+            _llm_proposal_prompt(
+                bootstrap_snapshot=bootstrap_snapshot,
+                decision_bundle=decision_bundle,
+                mutation_brief=mutation_brief,
+                parent_diagnosis=parent_diagnosis,
+                parent_summary=parent_summary,
+                branching_mode=branching_mode,
+                fallback_target=target,
+                fallback_changes=changes,
+                fallback_rationale=rationale,
+            )
+            + "\n\n"
+            + _llm_lever_retry_prompt(target_module=targeted_module),
+            cwd=candidate_root,
+        )
+        retry_normalized = _normalize_llm_proposal_payload(retry_payload or {}, target, changes, rationale)
+        if retry_normalized:
+            rationale, target, changes, backend_levers, no_lever_reason = retry_normalized
     backend_levers = _soft_wait_backend_levers(backend_levers, mutation_brief)
     log.info("proposal authored by claude")
     return rationale, target, changes, backend_levers
