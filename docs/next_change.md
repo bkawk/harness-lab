@@ -1,6 +1,6 @@
 # Next Change
 
-- summary: Current priority is `evaluation`, but only 0 scored candidate(s) have landed since the last structural change.
+- summary: Current priority is `evaluation`, but only 1 scored candidate(s) have landed since the last structural change.
 - recommended_action: `wait`
 - target_module: `science_model`
 
@@ -8,14 +8,14 @@
 - Improve transfer-stability evaluation or smoke tests so promising candidates fail earlier before full audit.
 
 ## Why This Module
-- Recent backend edits are concentrated in `science_model` with average transfer gap 0.038415. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation. Hold off on a mutation until the post-change sample is less thin. 0 scored candidate(s) have landed since structural commit `5f3e4a6`.
+- Recent backend edits are concentrated in `science_model` with average transfer gap 0.038722. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation. Hold off on a mutation until the post-change sample is less thin. 1 scored candidate(s) have landed since structural commit `5f3e4a6`.
 
 ## Secondary Context
-- Recent real-backend runs are only using about 589.8 MB on average, leaving most VRAM unused. 0 scored candidate(s) have landed since structural commit `5f3e4a6`.
+- Recent real-backend runs are only using about 592.2 MB on average, leaving most VRAM unused. 1 scored candidate(s) have landed since structural commit `5f3e4a6`.
 
 ## Options
-- [Option] Mutate science_model: Recent backend edits are concentrated in `science_model` with average transfer gap 0.038415. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation. Hold off on a mutation until the post-change sample is less thin. 0 scored candidate(s) have landed since structural commit `5f3e4a6`.
-- [Recommended] Wait for more data: Only 0 scored candidate(s) have landed since the last structural change; wait until at least 3 post-change scored candidates exist.
+- [Option] Mutate science_model: Recent backend edits are concentrated in `science_model` with average transfer gap 0.038722. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation. Hold off on a mutation until the post-change sample is less thin. 1 scored candidate(s) have landed since structural commit `5f3e4a6`.
+- [Recommended] Wait for more data: Only 1 scored candidate(s) have landed since the last structural change; wait until at least 3 post-change scored candidates exist.
 
 ## Evidence
 - `artifacts/memory/hindsight.json`
