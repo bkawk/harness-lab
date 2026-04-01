@@ -138,11 +138,21 @@ def derive_config(candidate_id: str, proposal: dict, diagnosis: dict) -> Science
     mechanism = str(proposal.get("target", {}).get("harness_component", "")).strip().lower()
     expected_failure = str(proposal.get("target", {}).get("expected_failure_mode", "")).strip().lower()
     change_kinds = {str(item.get("kind", "")).strip().lower() for item in proposal.get("changes", [])}
+    boundary_expected = "boundary" in expected_failure
 
-    if "transfer" in expected_failure or "audit" in expected_failure or "transfer" in mechanism:
-        cfg = ScienceConfig(
-            **{**asdict(cfg), "lr": min(cfg.lr, 2.5e-4), "weight_decay": 2e-4, "instance_loss_weight": min(cfg.instance_loss_weight, 0.04)}
-        )
+    if "transfer" in expected_failure or "audit" in expected_failure or "transfer" in mechanism or boundary_expected:
+        transfer_updates = {
+            **asdict(cfg),
+            "lr": min(cfg.lr, 2.5e-4),
+            "weight_decay": 2e-4,
+        }
+        if boundary_expected:
+            transfer_updates["boundary_loss_weight"] = max(cfg.boundary_loss_weight, 0.12)
+            transfer_updates["instance_loss_weight"] = max(cfg.instance_loss_weight, 0.06)
+            transfer_updates["k_neighbors"] = max(cfg.k_neighbors, 8)
+        else:
+            transfer_updates["instance_loss_weight"] = min(cfg.instance_loss_weight, 0.04)
+        cfg = ScienceConfig(**transfer_updates)
     if "budget_guardrail" in change_kinds or "diversity_warning" in change_kinds:
         cfg = ScienceConfig(
             **{

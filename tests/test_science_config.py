@@ -46,3 +46,21 @@ def test_derive_config_applies_bounded_backend_levers():
     assert cfg.instance_loss_weight == 0.12
     assert cfg.transfer_smoke_max_gap == 0.02
     assert cfg.batch_size == 3
+
+
+def test_derive_config_strengthens_boundary_transfer_seed_defaults():
+    cfg = derive_config(
+        "cand_0101",
+        {
+            "target": {
+                "harness_component": "science_loss",
+                "expected_failure_mode": "boundary_smoke:gap_too_wide",
+            },
+            "changes": [],
+        },
+        {},
+    )
+
+    assert cfg.boundary_loss_weight >= 0.12
+    assert cfg.instance_loss_weight >= 0.06
+    assert cfg.k_neighbors >= 8
