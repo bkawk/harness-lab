@@ -1,21 +1,21 @@
 # Next Change
 
-- summary: Current priority is `vram_headroom`, but only 2 scored candidate(s) have landed since the last structural change, so broad mutation should wait while conservative lever nudges remain allowed.
-- recommended_action: `wait`
+- summary: Current priority is `vram_headroom` with selection mode `stabilize`.
+- recommended_action: `targeted_mutation`
 - target_module: `science_train`
 
 ## Problem
 - Consider increasing batch size or model capacity so the science backend uses more of the available VRAM.
 
 ## Why This Module
-- The top live pressure is unused VRAM headroom, so favor explicit train-capacity moves first. Start with batch_size and eval_batch_size before drifting back to loss tuning. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation. Hold off on broad mutation until the post-change sample is less thin. Small conservative lever nudges are still allowed. 2 scored candidate(s) have landed since structural commit `4d32d84`.
+- The top live pressure is unused VRAM headroom, so favor explicit train-capacity moves first. Start with batch_size and eval_batch_size before drifting back to loss tuning. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation.
 
 ## Secondary Context
-- Recent real-backend runs are only using about 611.5 MB on average, leaving most VRAM unused. 2 scored candidate(s) have landed since structural commit `4d32d84`.
+- Recent real-backend runs are only using about 725.9 MB on average, leaving most VRAM unused. 4 scored candidate(s) have landed since structural commit `4d32d84`.
 
 ## Options
-- [Option] Mutate science_train: The top live pressure is unused VRAM headroom, so favor explicit train-capacity moves first. Start with batch_size and eval_batch_size before drifting back to loss tuning. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation. Hold off on broad mutation until the post-change sample is less thin. Small conservative lever nudges are still allowed. 2 scored candidate(s) have landed since structural commit `4d32d84`.
-- [Recommended] Wait on broad mutation: Only 2 scored candidate(s) have landed since the last structural change; wait on broad mutation until at least 3 post-change scored candidates exist, but conservative lever nudges are still allowed.
+- [Recommended] Mutate science_train: The top live pressure is unused VRAM headroom, so favor explicit train-capacity moves first. Start with batch_size and eval_batch_size before drifting back to loss tuning. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation.
+- [Option] Wait on broad mutation: Recent evidence may still be too thin or too noisy for broad mutation, but conservative lever nudges are still allowed while more scored candidates accumulate.
 
 ## Evidence
 - `artifacts/memory/science_debug_summary.json`

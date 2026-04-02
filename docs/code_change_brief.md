@@ -1,7 +1,7 @@
 # Code Change Brief
 
-- summary: Current priority is `vram_headroom`, but only 2 scored candidate(s) have landed since the last structural change, so broad mutation should wait while conservative lever nudges remain allowed.
-- recommended_action: `wait`
+- summary: Current priority is `vram_headroom` with selection mode `stabilize`.
+- recommended_action: `targeted_mutation`
 - target_module: `science_train`
 - target_file: `src/harness_lab/science_train.py`
 
@@ -14,7 +14,7 @@
 - Consider increasing batch size or model capacity so the science backend uses more of the available VRAM.
 
 ## Why This Module
-- The top live pressure is unused VRAM headroom, so favor explicit train-capacity moves first. Start with batch_size and eval_batch_size before drifting back to loss tuning. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation. Hold off on broad mutation until the post-change sample is less thin. Small conservative lever nudges are still allowed. 2 scored candidate(s) have landed since structural commit `4d32d84`.
+- The top live pressure is unused VRAM headroom, so favor explicit train-capacity moves first. Start with batch_size and eval_batch_size before drifting back to loss tuning. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation.
 
 ## Code Hypothesis
 - The current opportunity is more likely to improve through train-side capacity use than through loss or eval changes first.
@@ -58,7 +58,7 @@
 - Do not silently roll back and hide the failure; instead leave the failed attempt visible to human review.
 
 ## Wait Option
-- Wait on broad mutation: Only 2 scored candidate(s) have landed since the last structural change; wait on broad mutation until at least 3 post-change scored candidates exist, but conservative lever nudges are still allowed.
+- Wait on broad mutation: Recent evidence may still be too thin or too noisy for broad mutation, but conservative lever nudges are still allowed while more scored candidates accumulate.
 
 ## Evidence
 - `artifacts/memory/science_debug_summary.json`
