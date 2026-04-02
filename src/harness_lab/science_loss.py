@@ -47,7 +47,17 @@ def compute_loss(
     pos_weight = ((1.0 - boundary_pos) / boundary_pos).detach()
     boundary_loss = F.binary_cross_entropy_with_logits(boundary_logits, batch["boundary"], pos_weight=pos_weight)
     instance_loss = compute_instance_loss(instance_embed, batch["labels"], batch["instance_ids"], cfg.instance_margin)
-    loss = cls_loss + cfg.param_loss_weight * param_loss + cfg.boundary_loss_weight * boundary_loss + cfg.instance_loss_weight * instance_loss
+    # Keep the existing loss recipe, but modestly strengthen transfer-sensitive terms
+    # when the batch actually contains sparse boundary structure and valid instances.
+    boundary_focus = (1.0 + 0.25 * (1.0 - boundary_pos)).detach()
+    valid_instance_fraction = (batch["instance_ids"] >= 0).float().mean().clamp(min=0.0, max=1.0)
+    instance_focus = (1.0 + 0.15 * valid_instance_fraction).detach()
+    loss = (
+        cls_loss
+        + cfg.param_loss_weight * param_loss
+        + cfg.boundary_loss_weight * boundary_focus * boundary_loss
+        + cfg.instance_loss_weight * instance_focus * instance_loss
+    )
     return loss, {
         "loss": float(loss.detach().item()),
         "cls_loss": float(cls_loss.detach().item()),

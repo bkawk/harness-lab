@@ -1,6 +1,6 @@
 # Code Change Brief
 
-- summary: Current priority is `non_self_evolving` with selection mode `stabilize`.
+- summary: Current priority is `evaluation` with selection mode `stabilize`.
 - recommended_action: `targeted_mutation`
 - target_module: `science_loss`
 - target_file: `src/harness_lab/science_loss.py`
@@ -10,7 +10,7 @@
 - `compute_loss`
 
 ## Problem
-- Consider strengthening the non-self-evolving seed around `boundary_smoke:gap_too_wide` if that failure mode keeps dominating.
+- Improve transfer-stability evaluation or smoke tests so promising candidates fail earlier before full audit.
 
 ## Why This Module
 - Recent failures are boundary-transfer specific, so the loss surface is the best next bounded module to adjust. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation.
@@ -60,9 +60,8 @@
 - Wait on broad mutation: Recent evidence may still be too thin or too noisy for broad mutation, but conservative lever nudges are still allowed while more scored candidates accumulate.
 
 ## Evidence
-- `artifacts/memory/candidate_index.json`
 - `artifacts/memory/hindsight.json`
-- `artifacts/memory/policy.json`
+- `artifacts/memory/science_summary.json`
 - `artifacts/memory/backend_module_summary.json`
 - `src/harness_lab/science_loss.py`
 - `failure_to_code:boundary_smoke:gap_too_wide`
