@@ -11,7 +11,7 @@
 - Recent failures are boundary-transfer specific, so the loss surface is the best next bounded module to adjust. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation.
 
 ## Secondary Context
-- Recent real-backend runs are only using about 727.2 MB on average, leaving most VRAM unused. 12 scored candidate(s) have landed since structural commit `49fb173`.
+- Recent real-backend runs are only using about 727.5 MB on average, leaving most VRAM unused. 13 scored candidate(s) have landed since structural commit `49fb173`.
 
 ## Options
 - [Recommended] Mutate science_loss: Recent failures are boundary-transfer specific, so the loss surface is the best next bounded module to adjust. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation.
