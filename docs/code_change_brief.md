@@ -20,8 +20,8 @@
 - The current problem is more likely to improve through sharper smoke/audit discrimination than through changing model or loss pressure first.
 
 ## Decision State
-- `iterate`
-- `science_eval` is already the active recent seam with outcomes ['dead_end', 'audit_blocked'], so keep iterating on that line rather than issuing a brand-new brief.
+- `switch`
+- `science_eval` is already active in the recent scored window but is repeating dead-end outcomes without a keeper signal, so switch seams instead of issuing another brief here.
 
 ## Proposed Change
 - Tighten or clarify smoke and audit classification so severe non-robustness fails earlier while borderline promising runs remain distinguishable.
