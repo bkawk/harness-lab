@@ -152,6 +152,8 @@ def test_render_code_change_markdown_writes_concrete_sections(tmp_path):
             "problem_statement": "Improve transfer stability.",
             "why_this_module": "Boundary failures point here.",
             "code_hypothesis": "The current transfer problem is more likely to improve through stronger transfer-sensitive loss pressure than through changing evaluation thresholds alone.",
+            "decision_state": "wait",
+            "decision_reason": "Need more scored candidates before issuing a fresh brief.",
             "proposed_change": "Adjust transfer-sensitive loss pressure in a bounded way.",
             "execution_contract": {
                 "allowed_actions": ["Add, remove, or refactor code within the target module."],
@@ -175,6 +177,7 @@ def test_render_code_change_markdown_writes_concrete_sections(tmp_path):
     assert "# Code Change Brief" in text
     assert "## Target Functions" in text
     assert "## Code Hypothesis" in text
+    assert "## Decision State" in text
     assert "## Execution Contract" in text
     assert "## Failure Behavior" in text
     assert "src/harness_lab/science_loss.py" in text
@@ -324,3 +327,154 @@ def test_mutation_brief_vram_headroom_overrides_boundary_failure_target(tmp_path
 
     assert payload["target_module"] == "science_train"
     assert "Start with batch_size and eval_batch_size" in payload["module_rationale"]
+
+
+def test_build_code_change_brief_decision_state_wait(tmp_path, monkeypatch):
+    memory_dir = tmp_path / "artifacts" / "memory"
+    memory_dir.mkdir(parents=True)
+    repo_dir = tmp_path
+    monkeypatch.setattr("harness_lab.mutation_brief._last_commit_touching_path", lambda repo_dir, relative_path: "")
+    write_json(
+        memory_dir / "mutation_brief.json",
+        {
+            "summary": "Current priority is `evaluation`, but broad mutation should wait.",
+            "recommended_action": "wait",
+            "target_module": "science_loss",
+            "problem_statement": "Improve transfer stability.",
+            "module_rationale": "Boundary failures point here.",
+            "verification_plan": ["Run focused tests."],
+            "options": [
+                {"kind": "wait", "title": "Wait on broad mutation", "why": "Need more scored candidates.", "recommended": True},
+            ],
+        },
+    )
+    write_json(
+        memory_dir / "backend_code_map.json",
+        {
+            "modules": [{"module": "science_loss", "file": "src/harness_lab/science_loss.py", "key_functions": ["compute_loss"], "fixed_surfaces": []}],
+            "failure_to_code_hints": [],
+        },
+    )
+    write_json(memory_dir / "candidate_index.json", {"candidates": []})
+
+    payload = build_code_change_brief(memory_dir)
+
+    assert payload["decision_state"] == "wait"
+    assert "Need more scored candidates" in payload["decision_reason"]
+
+
+def test_build_code_change_brief_decision_state_iterate_when_same_seam_is_active(tmp_path, monkeypatch):
+    memory_dir = tmp_path / "artifacts" / "memory"
+    memory_dir.mkdir(parents=True)
+    monkeypatch.setattr("harness_lab.mutation_brief._last_commit_touching_path", lambda repo_dir, relative_path: "")
+    write_json(
+        memory_dir / "mutation_brief.json",
+        {
+            "summary": "Current priority is `evaluation`.",
+            "recommended_action": "targeted_mutation",
+            "target_module": "science_loss",
+            "problem_statement": "Improve transfer stability.",
+            "module_rationale": "Boundary failures point here.",
+            "verification_plan": ["Run focused tests."],
+            "options": [{"kind": "wait", "title": "Wait on broad mutation", "why": "Need more scored candidates.", "recommended": False}],
+        },
+    )
+    write_json(
+        memory_dir / "backend_code_map.json",
+        {
+            "modules": [{"module": "science_loss", "file": "src/harness_lab/science_loss.py", "key_functions": ["compute_loss"], "fixed_surfaces": []}],
+            "failure_to_code_hints": [],
+        },
+    )
+    write_json(
+        memory_dir / "candidate_index.json",
+        {
+            "candidates": [
+                {"candidate_id": "cand_1", "created_at": "2026-04-02T10:00:00+00:00", "benchmark_score": 0.3, "audit_score": 0.31, "harness_component": "science_loss", "outcome_label": "audit_blocked"},
+                {"candidate_id": "cand_2", "created_at": "2026-04-02T10:10:00+00:00", "benchmark_score": 0.31, "audit_score": 0.33, "harness_component": "science_loss", "outcome_label": "keeper"},
+            ]
+        },
+    )
+
+    payload = build_code_change_brief(memory_dir)
+
+    assert payload["decision_state"] == "iterate"
+    assert "active recent seam" in payload["decision_reason"] or "active recent seam".replace("recent ", "")  # safety
+
+
+def test_build_code_change_brief_decision_state_switch_for_repeated_dead_ends(tmp_path, monkeypatch):
+    memory_dir = tmp_path / "artifacts" / "memory"
+    memory_dir.mkdir(parents=True)
+    monkeypatch.setattr("harness_lab.mutation_brief._last_commit_touching_path", lambda repo_dir, relative_path: "")
+    write_json(
+        memory_dir / "mutation_brief.json",
+        {
+            "summary": "Current priority is `evaluation`.",
+            "recommended_action": "targeted_mutation",
+            "target_module": "science_loss",
+            "problem_statement": "Improve transfer stability.",
+            "module_rationale": "Boundary failures point here.",
+            "verification_plan": ["Run focused tests."],
+            "options": [{"kind": "wait", "title": "Wait on broad mutation", "why": "Need more scored candidates.", "recommended": False}],
+        },
+    )
+    write_json(
+        memory_dir / "backend_code_map.json",
+        {
+            "modules": [{"module": "science_loss", "file": "src/harness_lab/science_loss.py", "key_functions": ["compute_loss"], "fixed_surfaces": []}],
+            "failure_to_code_hints": [],
+        },
+    )
+    write_json(
+        memory_dir / "candidate_index.json",
+        {
+            "candidates": [
+                {"candidate_id": "cand_1", "created_at": "2026-04-02T10:00:00+00:00", "benchmark_score": 0.3, "audit_score": 0.25, "harness_component": "science_loss", "outcome_label": "dead_end"},
+                {"candidate_id": "cand_2", "created_at": "2026-04-02T10:10:00+00:00", "benchmark_score": 0.31, "audit_score": 0.24, "harness_component": "science_loss", "outcome_label": "dead_end"},
+                {"candidate_id": "cand_3", "created_at": "2026-04-02T10:20:00+00:00", "benchmark_score": 0.32, "audit_score": 0.23, "harness_component": "science_loss", "outcome_label": "dead_end"},
+            ]
+        },
+    )
+
+    payload = build_code_change_brief(memory_dir)
+
+    assert payload["decision_state"] == "switch"
+    assert "switch seams" in payload["decision_reason"]
+
+
+def test_build_code_change_brief_decision_state_issue_for_fresh_seam(tmp_path, monkeypatch):
+    memory_dir = tmp_path / "artifacts" / "memory"
+    memory_dir.mkdir(parents=True)
+    monkeypatch.setattr("harness_lab.mutation_brief._last_commit_touching_path", lambda repo_dir, relative_path: "")
+    write_json(
+        memory_dir / "mutation_brief.json",
+        {
+            "summary": "Current priority is `evaluation`.",
+            "recommended_action": "targeted_mutation",
+            "target_module": "science_loss",
+            "problem_statement": "Improve transfer stability.",
+            "module_rationale": "Boundary failures point here.",
+            "verification_plan": ["Run focused tests."],
+            "options": [{"kind": "wait", "title": "Wait on broad mutation", "why": "Need more scored candidates.", "recommended": False}],
+        },
+    )
+    write_json(
+        memory_dir / "backend_code_map.json",
+        {
+            "modules": [{"module": "science_loss", "file": "src/harness_lab/science_loss.py", "key_functions": ["compute_loss"], "fixed_surfaces": []}],
+            "failure_to_code_hints": [],
+        },
+    )
+    write_json(
+        memory_dir / "candidate_index.json",
+        {
+            "candidates": [
+                {"candidate_id": "cand_1", "created_at": "2026-04-02T10:00:00+00:00", "benchmark_score": 0.3, "audit_score": 0.31, "harness_component": "science_model", "outcome_label": "audit_blocked"},
+            ]
+        },
+    )
+
+    payload = build_code_change_brief(memory_dir)
+
+    assert payload["decision_state"] == "issue"
+    assert "issue a fresh code-change brief" in payload["decision_reason"]

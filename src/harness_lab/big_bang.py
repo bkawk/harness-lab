@@ -321,6 +321,8 @@ def render_big_bang_markdown(
     if not failure_hint_lines:
         failure_hint_lines = ["- no failure-to-code hints yet"]
     code_change_lines = [
+        f"- decision_state: `{code_change_brief.get('decision_state', '-') or '-'}`",
+        f"- decision_reason: `{code_change_brief.get('decision_reason', 'No decision reason recorded yet.')}`",
         f"- target_file: `{code_change_brief.get('target_file', '-') or '-'}`",
         f"- target_functions: `{', '.join(code_change_brief.get('target_functions', [])[:4]) or '-'}`",
         f"- proposed_change: `{code_change_brief.get('proposed_change', 'No proposed change yet.')}`",

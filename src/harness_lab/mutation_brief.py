@@ -131,6 +131,22 @@ def _commit_timestamp(repo_dir: Path, commit_sha: str) -> datetime | None:
         return None
 
 
+def _last_commit_touching_path(repo_dir: Path, relative_path: str) -> str:
+    if not relative_path:
+        return ""
+    try:
+        result = subprocess.run(
+            ["git", "log", "--format=%H", "-1", "--", relative_path],
+            cwd=repo_dir,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except Exception:
+        return ""
+    return result.stdout.strip()
+
+
 def _scored_candidates_since_commit(memory_dir: Path, commit_sha: str, *, repo_dir: Path) -> list[dict]:
     index_path = memory_dir / "candidate_index.json"
     if not commit_sha or not index_path.exists():
@@ -155,6 +171,97 @@ def _scored_candidates_since_commit(memory_dir: Path, commit_sha: str, *, repo_d
         if created_time > commit_time:
             items.append(candidate)
     return items
+
+
+def _recent_scored_candidates(memory_dir: Path, *, limit: int = 6) -> list[dict]:
+    index_path = memory_dir / "candidate_index.json"
+    if not index_path.exists():
+        return []
+    candidates = read_json(index_path).get("candidates", [])
+    scored = [item for item in candidates if item.get("benchmark_score") is not None or item.get("audit_score") is not None]
+    return list(scored[-limit:])
+
+
+def _code_change_decision(
+    *,
+    memory_dir: Path,
+    repo_dir: Path,
+    recommended_action: str,
+    target_module: str,
+    target_file: str,
+    wait_reason: str,
+) -> dict:
+    if not target_module or not target_file:
+        return {
+            "state": "suppress",
+            "reason": "No target seam is specific enough yet, so suppress a code-change brief until the module/file mapping is clearer.",
+            "recent_same_seam_activity": 0,
+            "recent_same_seam_outcomes": [],
+            "recent_code_change_commit": "",
+            "post_target_change_scored_candidates": 0,
+        }
+
+    recent_scored = _recent_scored_candidates(memory_dir)
+    same_seam = [item for item in recent_scored if str(item.get("harness_component", "")).strip() == target_module]
+    same_seam_outcomes = [str(item.get("outcome_label", "")).strip() for item in same_seam if str(item.get("outcome_label", "")).strip()]
+    keeper_count = sum(1 for item in same_seam if str(item.get("outcome_label", "")).strip() == "keeper")
+    dead_end_count = sum(1 for item in same_seam if str(item.get("outcome_label", "")).strip() == "dead_end")
+    recent_code_change_commit = _last_commit_touching_path(repo_dir, target_file)
+    post_target_change_scored = _scored_candidates_since_commit(memory_dir, recent_code_change_commit, repo_dir=repo_dir)
+
+    if recommended_action == "wait":
+        return {
+            "state": "wait",
+            "reason": wait_reason,
+            "recent_same_seam_activity": len(same_seam),
+            "recent_same_seam_outcomes": same_seam_outcomes,
+            "recent_code_change_commit": recent_code_change_commit,
+            "post_target_change_scored_candidates": len(post_target_change_scored),
+        }
+    if recent_code_change_commit and len(post_target_change_scored) < 3:
+        return {
+            "state": "iterate",
+            "reason": (
+                f"`{target_module}` was changed recently in `{recent_code_change_commit[:7]}`, and only "
+                f"{len(post_target_change_scored)} scored candidate(s) have landed since then, so iterate on the active line rather than issuing a fresh brief."
+            ),
+            "recent_same_seam_activity": len(same_seam),
+            "recent_same_seam_outcomes": same_seam_outcomes,
+            "recent_code_change_commit": recent_code_change_commit,
+            "post_target_change_scored_candidates": len(post_target_change_scored),
+        }
+    if len(same_seam) >= 3 and keeper_count == 0 and dead_end_count >= 2:
+        return {
+            "state": "switch",
+            "reason": (
+                f"`{target_module}` is already active in the recent scored window but is repeating dead-end outcomes "
+                "without a keeper signal, so switch seams instead of issuing another brief here."
+            ),
+            "recent_same_seam_activity": len(same_seam),
+            "recent_same_seam_outcomes": same_seam_outcomes,
+            "recent_code_change_commit": recent_code_change_commit,
+            "post_target_change_scored_candidates": len(post_target_change_scored),
+        }
+    if len(same_seam) >= 2:
+        return {
+            "state": "iterate",
+            "reason": (
+                f"`{target_module}` is already the active recent seam with outcomes {same_seam_outcomes or ['unknown']}, "
+                "so keep iterating on that line rather than issuing a brand-new brief."
+            ),
+            "recent_same_seam_activity": len(same_seam),
+            "recent_same_seam_outcomes": same_seam_outcomes,
+            "recent_code_change_commit": recent_code_change_commit,
+            "post_target_change_scored_candidates": len(post_target_change_scored),
+        }
+    return {
+        "state": "issue",
+        "reason": f"`{target_module}` is the top bounded seam and is not yet saturated by recent same-seam activity, so issue a fresh code-change brief.",
+        "recent_same_seam_activity": len(same_seam),
+        "recent_same_seam_outcomes": same_seam_outcomes,
+        "recent_code_change_commit": recent_code_change_commit,
+        "post_target_change_scored_candidates": len(post_target_change_scored),
+    }
 
 
 def build_mutation_brief(candidates_dir: Path, memory_dir: Path) -> dict:
@@ -410,6 +517,14 @@ def build_code_change_brief(memory_dir: Path) -> dict:
         )
     )
     supporting_evidence = [item for item in supporting_evidence if item]
+    decision = _code_change_decision(
+        memory_dir=memory_dir,
+        repo_dir=memory_dir.parent.parent,
+        recommended_action=recommended_action,
+        target_module=target_module,
+        target_file=str(target_context.get("file", "")).strip(),
+        wait_reason=str(wait_option.get("why", "More scored candidates are needed before acting.")).strip() or "More scored candidates are needed before acting.",
+    )
     return {
         "summary": brief.get("summary", "No code-change brief generated yet."),
         "recommended_action": recommended_action,
@@ -427,6 +542,14 @@ def build_code_change_brief(memory_dir: Path) -> dict:
         "verification_plan": list(brief.get("verification_plan", [])[:6]),
         "execution_contract": execution_contract,
         "supporting_evidence": supporting_evidence,
+        "decision_state": decision.get("state", "wait"),
+        "decision_reason": decision.get("reason", ""),
+        "decision_context": {
+            "recent_same_seam_activity": decision.get("recent_same_seam_activity", 0),
+            "recent_same_seam_outcomes": decision.get("recent_same_seam_outcomes", []),
+            "recent_code_change_commit": decision.get("recent_code_change_commit", ""),
+            "post_target_change_scored_candidates": decision.get("post_target_change_scored_candidates", 0),
+        },
         "abort_conditions": [
             "Abort if the change requires touching more than the target module plus adjacent tests.",
             "Abort if the intended effect cannot be verified with focused tests and one real candidate run.",
@@ -534,6 +657,10 @@ def render_code_change_markdown(repo_dir: Path, memory_dir: Path) -> Path:
             "",
             "## Code Hypothesis",
             f"- {brief.get('code_hypothesis', 'No code hypothesis yet.')}",
+            "",
+            "## Decision State",
+            f"- `{brief.get('decision_state', 'wait')}`",
+            f"- {brief.get('decision_reason', 'No decision reason recorded yet.')}",
             "",
             "## Proposed Change",
             *change_lines,
