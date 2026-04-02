@@ -1,21 +1,21 @@
 # Next Change
 
-- summary: Current priority is `evaluation`, but only 1 scored candidate(s) have landed since the last structural change, so broad mutation should wait while conservative lever nudges remain allowed.
-- recommended_action: `wait`
+- summary: Current priority is `evaluation` with selection mode `stabilize`.
+- recommended_action: `targeted_mutation`
 - target_module: `science_loss`
 
 ## Problem
 - Improve transfer-stability evaluation or smoke tests so promising candidates fail earlier before full audit.
 
 ## Why This Module
-- Recent failures are boundary-transfer specific, so the loss surface is the best next bounded module to adjust. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation. Hold off on broad mutation until the post-change sample is less thin. Small conservative lever nudges are still allowed. 1 scored candidate(s) have landed since structural commit `7fea1af`.
+- Recent failures are boundary-transfer specific, so the loss surface is the best next bounded module to adjust. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation.
 
 ## Secondary Context
-- Recent real-backend runs are only using about 754.0 MB on average, leaving most VRAM unused. 1 scored candidate(s) have landed since structural commit `7fea1af`.
+- Recent real-backend runs are only using about 688.9 MB on average, leaving most VRAM unused. 3 scored candidate(s) have landed since structural commit `7fea1af`.
 
 ## Options
-- [Option] Mutate science_loss: Recent failures are boundary-transfer specific, so the loss surface is the best next bounded module to adjust. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation. Hold off on broad mutation until the post-change sample is less thin. Small conservative lever nudges are still allowed. 1 scored candidate(s) have landed since structural commit `7fea1af`.
-- [Recommended] Wait on broad mutation: Only 1 scored candidate(s) have landed since the last structural change; wait on broad mutation until at least 3 post-change scored candidates exist, but conservative lever nudges are still allowed.
+- [Recommended] Mutate science_loss: Recent failures are boundary-transfer specific, so the loss surface is the best next bounded module to adjust. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation.
+- [Option] Wait on broad mutation: Recent evidence may still be too thin or too noisy for broad mutation, but conservative lever nudges are still allowed while more scored candidates accumulate.
 
 ## Evidence
 - `artifacts/memory/hindsight.json`
