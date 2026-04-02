@@ -2,19 +2,19 @@
 
 - summary: Current priority is `evaluation` with selection mode `stabilize`.
 - recommended_action: `targeted_mutation`
-- target_module: `science_eval`
+- target_module: `science_loss`
 
 ## Problem
 - Improve transfer-stability evaluation or smoke tests so promising candidates fail earlier before full audit.
 
 ## Why This Module
-- Recent failures are dominated by smoke-gate transfer checks, so the evaluation module is the best next bounded target. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation.
+- Recent failures are boundary-transfer specific, so the loss surface is the best next bounded module to adjust. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation.
 
 ## Secondary Context
-- Recent real-backend runs are only using about 782.9 MB on average, leaving most VRAM unused. 13 scored candidate(s) have landed since structural commit `7fea1af`.
+- Recent real-backend runs are only using about 743.9 MB on average, leaving most VRAM unused. 15 scored candidate(s) have landed since structural commit `7fea1af`.
 
 ## Options
-- [Recommended] Mutate science_eval: Recent failures are dominated by smoke-gate transfer checks, so the evaluation module is the best next bounded target. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation.
+- [Recommended] Mutate science_loss: Recent failures are boundary-transfer specific, so the loss surface is the best next bounded module to adjust. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation.
 - [Option] Wait on broad mutation: Recent evidence may still be too thin or too noisy for broad mutation, but conservative lever nudges are still allowed while more scored candidates accumulate.
 
 ## Evidence
