@@ -129,6 +129,19 @@ def _latest_backend_science_artifacts(candidates_dir: Path, index: dict, state: 
     return explicit_candidate_id, explicit_payload, effective_candidate_id, effective_payload
 
 
+def _latest_live_command_artifact(candidates_dir: Path, index: dict, state: dict) -> tuple[str, dict]:
+    fallback_candidate = str(state.get("active_candidate_id", "") or state.get("last_candidate_id", "") or "")
+    payload: dict = {}
+    chosen_candidate = fallback_candidate
+    for candidate_id in _candidate_lookup_order(index, state):
+        candidate_payload = _read_json_file(candidates_dir / candidate_id / "traces" / "live_command.json")
+        if candidate_payload:
+            chosen_candidate = candidate_id
+            payload = candidate_payload
+            break
+    return chosen_candidate, payload
+
+
 def render_big_bang_markdown(
     repo_dir: Path,
     candidates_dir: Path,
@@ -202,11 +215,7 @@ def render_big_bang_markdown(
     backend_code_map_path = memory_dir / "backend_code_map.json"
     if backend_code_map_path.exists():
         backend_code_map = json.loads(backend_code_map_path.read_text(encoding="utf-8"))
-    active_candidate_id = str(state.get("active_candidate_id", "") or "")
-    if active_candidate_id:
-        live_command_path = candidates_dir / active_candidate_id / "traces" / "live_command.json"
-        if live_command_path.exists():
-            live_command = json.loads(live_command_path.read_text(encoding="utf-8"))
+    active_candidate_id, live_command = _latest_live_command_artifact(candidates_dir, index, state)
     explicit_lever_candidate_id, lever_payload, effective_lever_candidate_id, effective_lever_payload = _latest_backend_science_artifacts(
         candidates_dir,
         index,
