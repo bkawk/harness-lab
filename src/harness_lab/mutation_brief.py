@@ -21,6 +21,14 @@ def next_change_markdown_path(repo_dir: Path) -> Path:
     return repo_dir / "docs" / "next_change.md"
 
 
+def code_change_brief_path(memory_dir: Path) -> Path:
+    return memory_dir / "code_change_brief.json"
+
+
+def code_change_markdown_path(repo_dir: Path) -> Path:
+    return repo_dir / "docs" / "code_change_brief.md"
+
+
 def _failure_mode_target(hindsight: dict, top_request: dict) -> tuple[str, str] | None:
     recent_failures = [
         str(item.get("label", "")).strip()
@@ -258,6 +266,132 @@ def write_mutation_brief(candidates_dir: Path, memory_dir: Path) -> Path:
     return path
 
 
+def _module_change_intent(target_module: str) -> str:
+    intents = {
+        "science_model": "Make a narrow representation-capacity or local-context adjustment that improves transfer without changing smoke thresholds or runner behavior.",
+        "science_loss": "Adjust transfer-sensitive loss pressure in a bounded way so boundary and instance structure hold up better on transfer slices.",
+        "science_eval": "Refine smoke or audit classification so severe non-robustness fails earlier while borderline promising runs remain distinguishable.",
+        "science_config": "Change config derivation or seed defaults for the targeted failure mode without broadening the search into unrelated modules.",
+        "science_train": "Change bounded training-capacity behavior, such as batch sizing or logging discipline, without altering model/loss semantics.",
+    }
+    return intents.get(target_module, "Make one narrow, testable change within the targeted backend module.")
+
+
+def _module_focused_tests(target_module: str) -> list[str]:
+    tests = {
+        "science_model": ["tests/test_science_model.py"],
+        "science_loss": ["tests/test_science_loss.py"],
+        "science_eval": ["tests/test_science_smoke_gate.py", "tests/test_science_eval.py"],
+        "science_config": ["tests/test_science_config.py"],
+        "science_train": ["tests/test_science_train.py"],
+    }
+    return tests.get(target_module, [])
+
+
+def _module_acceptance_checks(target_module: str) -> list[str]:
+    checks = {
+        "science_model": [
+            "The target module still produces real science traces and completes benchmark/smoke/audit in the normal backend path.",
+            "The change remains bounded to model-capacity or local-context behavior rather than broad training-policy changes.",
+        ],
+        "science_loss": [
+            "The loss change remains bounded to transfer-sensitive pressure and does not silently rewrite evaluation logic.",
+            "The next real candidate should produce clearer transfer behavior without breaking trace emission or outcome writing.",
+        ],
+        "science_eval": [
+            "The eval change distinguishes severe failures earlier without collapsing moderate candidates into dead_end too aggressively.",
+            "Smoke and audit traces should still be written normally for eligible candidates.",
+        ],
+        "science_config": [
+            "The config change should remain deterministic and bounded under the existing lever ranges and seed rules.",
+            "The next candidate should show the intended config shift in effective_backend_config.json.",
+        ],
+        "science_train": [
+            "The train change should visibly alter effective batch/log settings without breaking wall-clock reserve discipline.",
+            "The next candidate should still write progress and result artifacts through the normal command backend.",
+        ],
+    }
+    return checks.get(target_module, ["The change should remain bounded, traceable, and verifiable in one real candidate run."])
+
+
+def _module_do_not_change(target_module: str) -> list[str]:
+    locked = {
+        "science_model": [
+            "Do not change science_eval smoke thresholds in the same patch.",
+            "Do not alter runner wall-clock or fallback behavior.",
+        ],
+        "science_loss": [
+            "Do not change science_eval thresholds in the same patch.",
+            "Do not broaden into model architecture rewrites or dataset changes.",
+        ],
+        "science_eval": [
+            "Do not change model or loss behavior in the same patch.",
+            "Do not modify dataset preparation or runner backend behavior.",
+        ],
+        "science_config": [
+            "Do not rewrite model, loss, or eval internals in the same patch.",
+            "Do not bypass bounded lever clamping or env overrides.",
+        ],
+        "science_train": [
+            "Do not change science_eval or loss semantics in the same patch.",
+            "Do not remove progress, metrics, or backend result traces.",
+        ],
+    }
+    return locked.get(target_module, ["Do not broaden the change into unrelated modules in the same patch."])
+
+
+def build_code_change_brief(memory_dir: Path) -> dict:
+    brief = read_json(mutation_brief_path(memory_dir)) if mutation_brief_path(memory_dir).exists() else {}
+    code_map = read_json(memory_dir / "backend_code_map.json") if (memory_dir / "backend_code_map.json").exists() else {}
+    target_module = str(brief.get("target_module", "")).strip()
+    target_context = next(
+        (item for item in code_map.get("modules", []) if str(item.get("module", "")).strip() == target_module),
+        {},
+    )
+    wait_option = next((item for item in brief.get("options", []) if str(item.get("kind", "")).strip() == "wait"), {})
+    recommended_action = str(brief.get("recommended_action", "wait")).strip() or "wait"
+    focused_tests = _module_focused_tests(target_module)
+    acceptance_checks = _module_acceptance_checks(target_module)
+    do_not_change = _module_do_not_change(target_module)
+    fixed_surfaces = [str(item).strip() for item in target_context.get("fixed_surfaces", []) if str(item).strip()]
+    if fixed_surfaces:
+        do_not_change.append(f"Do not rewrite these fixed surfaces in the same patch: {'; '.join(fixed_surfaces[:3])}.")
+    supporting_evidence = list(dict.fromkeys([*(brief.get("supporting_evidence", [])[:6]), str(target_context.get("file", "")).strip()]))
+    supporting_evidence = [item for item in supporting_evidence if item]
+    return {
+        "summary": brief.get("summary", "No code-change brief generated yet."),
+        "recommended_action": recommended_action,
+        "target_module": target_module,
+        "target_file": str(target_context.get("file", "")).strip(),
+        "target_functions": list(target_context.get("key_functions", [])[:6]),
+        "problem_statement": str(brief.get("problem_statement", "")).strip(),
+        "why_this_module": str(brief.get("module_rationale", "")).strip(),
+        "proposed_change": _module_change_intent(target_module),
+        "do_not_change": do_not_change,
+        "acceptance_checks": acceptance_checks,
+        "focused_tests": focused_tests,
+        "verification_plan": list(brief.get("verification_plan", [])[:6]),
+        "supporting_evidence": supporting_evidence,
+        "abort_conditions": [
+            "Abort if the change requires touching more than the target module plus adjacent tests.",
+            "Abort if the intended effect cannot be verified with focused tests and one real candidate run.",
+            "Abort if the post-change evidence is still too thin and the wait option is the recommended path.",
+        ],
+        "wait_option": {
+            "title": str(wait_option.get("title", "Wait on broad mutation")).strip() or "Wait on broad mutation",
+            "why": str(wait_option.get("why", "More scored candidates are needed before acting.")).strip() or "More scored candidates are needed before acting.",
+        },
+        "note": "This brief is generated for review only. It should sharpen code-change planning, not authorize autonomous code edits.",
+    }
+
+
+def write_code_change_brief(memory_dir: Path) -> Path:
+    memory_dir.mkdir(parents=True, exist_ok=True)
+    path = code_change_brief_path(memory_dir)
+    write_json(path, build_code_change_brief(memory_dir))
+    return path
+
+
 def render_next_change_markdown(repo_dir: Path, memory_dir: Path) -> Path:
     docs_dir = repo_dir / "docs"
     docs_dir.mkdir(parents=True, exist_ok=True)
@@ -301,6 +435,70 @@ def render_next_change_markdown(repo_dir: Path, memory_dir: Path) -> Path:
             "",
             "## Note",
             "- This brief is generated for review only. It does not authorize or trigger code changes by itself.",
+        ]
+    )
+    path.write_text(content + "\n", encoding="utf-8")
+    return path
+
+
+def render_code_change_markdown(repo_dir: Path, memory_dir: Path) -> Path:
+    docs_dir = repo_dir / "docs"
+    docs_dir.mkdir(parents=True, exist_ok=True)
+    path = code_change_markdown_path(repo_dir)
+    brief = read_json(code_change_brief_path(memory_dir)) if code_change_brief_path(memory_dir).exists() else {}
+    function_lines = [f"- `{item}`" for item in brief.get("target_functions", [])[:6]] or ["- `No target functions identified yet.`"]
+    evidence_lines = [f"- `{item}`" for item in brief.get("supporting_evidence", [])[:8]] or ["- `No supporting evidence recorded yet.`"]
+    change_lines = [f"- {brief.get('proposed_change', 'No proposed change yet.')}"]
+    do_not_change_lines = [f"- {item}" for item in brief.get("do_not_change", [])[:8]] or ["- Do not broaden the patch into unrelated modules."]
+    acceptance_lines = [f"- {item}" for item in brief.get("acceptance_checks", [])[:8]] or ["- No acceptance checks recorded yet."]
+    test_lines = [f"- `{item}`" for item in brief.get("focused_tests", [])[:6]] or ["- `No focused tests recorded yet.`"]
+    verification_lines = [f"- {item}" for item in brief.get("verification_plan", [])[:8]] or ["- No verification plan recorded yet."]
+    abort_lines = [f"- {item}" for item in brief.get("abort_conditions", [])[:6]] or ["- No abort conditions recorded yet."]
+    wait_option = brief.get("wait_option", {})
+    content = "\n".join(
+        [
+            "# Code Change Brief",
+            "",
+            f"- summary: {brief.get('summary', 'No code-change brief generated yet.')}",
+            f"- recommended_action: `{brief.get('recommended_action', 'wait')}`",
+            f"- target_module: `{brief.get('target_module', '-') or '-'}`",
+            f"- target_file: `{brief.get('target_file', '-') or '-'}`",
+            "",
+            "## Target Functions",
+            *function_lines,
+            "",
+            "## Problem",
+            f"- {brief.get('problem_statement', 'No problem statement yet.')}",
+            "",
+            "## Why This Module",
+            f"- {brief.get('why_this_module', 'No module rationale yet.')}",
+            "",
+            "## Proposed Change",
+            *change_lines,
+            "",
+            "## Do Not Change",
+            *do_not_change_lines,
+            "",
+            "## Acceptance Checks",
+            *acceptance_lines,
+            "",
+            "## Focused Tests",
+            *test_lines,
+            "",
+            "## Verification",
+            *verification_lines,
+            "",
+            "## Abort Conditions",
+            *abort_lines,
+            "",
+            "## Wait Option",
+            f"- {wait_option.get('title', 'Wait on broad mutation')}: {wait_option.get('why', 'More scored candidates are needed before acting.')}",
+            "",
+            "## Evidence",
+            *evidence_lines,
+            "",
+            "## Note",
+            f"- {brief.get('note', 'This brief is generated for review only.')}",
         ]
     )
     path.write_text(content + "\n", encoding="utf-8")

@@ -18,7 +18,7 @@ from harness_lab.human_feedback import (
 )
 from harness_lab.hindsight import write_hindsight
 from harness_lab.memory import build_candidate_index, write_backend_code_map
-from harness_lab.mutation_brief import render_next_change_markdown, write_mutation_brief
+from harness_lab.mutation_brief import render_code_change_markdown, render_next_change_markdown, write_code_change_brief, write_mutation_brief
 from harness_lab.orchestrator import GENESIS_CANDIDATE_ID, LabStepResult, next_candidate_id, run_lab_step
 from harness_lab.policy import read_policy, write_policy
 from harness_lab.publisher import publish_repo_snapshot
@@ -176,6 +176,7 @@ def render_big_bang_markdown(
     human_feedback_responses = {}
     science_summary = {}
     mutation_brief = {}
+    code_change_brief = {}
     backend_module_summary = {}
     backend_code_map = {}
     live_command = {}
@@ -185,6 +186,7 @@ def render_big_bang_markdown(
         write_policy(candidates_dir, memory_dir, memory_dir / "policy.json")
         write_human_feedback(memory_dir, memory_dir / "human_feedback.json")
         write_mutation_brief(candidates_dir, memory_dir)
+        write_code_change_brief(memory_dir)
         write_budget(memory_dir, budget_path)
         write_diversity(candidates_dir, diversity_path)
         write_backend_code_map(repo_dir, memory_dir / "backend_code_map.json")
@@ -192,6 +194,7 @@ def render_big_bang_markdown(
 
         write_science_summary(candidates_dir, science_summary_path)
         render_next_change_markdown(repo_dir, memory_dir)
+        render_code_change_markdown(repo_dir, memory_dir)
     if hindsight_path.exists():
         hindsight = json.loads(hindsight_path.read_text(encoding="utf-8"))
     policy_path = memory_dir / "policy.json"
@@ -210,6 +213,9 @@ def render_big_bang_markdown(
         science_summary = json.loads(science_summary_path.read_text(encoding="utf-8"))
     if mutation_brief_path.exists():
         mutation_brief = json.loads(mutation_brief_path.read_text(encoding="utf-8"))
+    code_change_brief_path = memory_dir / "code_change_brief.json"
+    if code_change_brief_path.exists():
+        code_change_brief = json.loads(code_change_brief_path.read_text(encoding="utf-8"))
     if backend_module_summary_path.exists():
         backend_module_summary = json.loads(backend_module_summary_path.read_text(encoding="utf-8"))
     backend_code_map_path = memory_dir / "backend_code_map.json"
@@ -312,6 +318,12 @@ def render_big_bang_markdown(
         )
     if not failure_hint_lines:
         failure_hint_lines = ["- no failure-to-code hints yet"]
+    code_change_lines = [
+        f"- target_file: `{code_change_brief.get('target_file', '-') or '-'}`",
+        f"- target_functions: `{', '.join(code_change_brief.get('target_functions', [])[:4]) or '-'}`",
+        f"- proposed_change: `{code_change_brief.get('proposed_change', 'No proposed change yet.')}`",
+        f"- wait_option: `{code_change_brief.get('wait_option', {}).get('why', 'No wait option recorded yet.')}`",
+    ]
     backend_science_lines = [
         f"- summary: `{backend_module_summary.get('summary', 'No backend-science summary yet.')}`",
         f"- recommended_action: `{mutation_brief.get('recommended_action', 'wait')}`",
@@ -494,6 +506,9 @@ def render_big_bang_markdown(
             "",
             "### Failure-To-Code Hints",
             *failure_hint_lines,
+            "",
+            "### Code Change Brief",
+            *code_change_lines,
             "",
             "## External Review",
             f"- status: `{external_review.get('status', 'idle')}`",

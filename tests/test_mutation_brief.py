@@ -1,4 +1,9 @@
-from harness_lab.mutation_brief import build_mutation_brief, render_next_change_markdown
+from harness_lab.mutation_brief import (
+    build_code_change_brief,
+    build_mutation_brief,
+    render_code_change_markdown,
+    render_next_change_markdown,
+)
 from harness_lab.workspace import write_json
 
 
@@ -73,6 +78,86 @@ def test_render_next_change_markdown_writes_wait_option(tmp_path):
     assert "## Why This Module" in text
     assert "## Secondary Context" in text
     assert "does not authorize or trigger code changes" in text
+
+
+def test_build_code_change_brief_uses_code_context(tmp_path):
+    memory_dir = tmp_path / "artifacts" / "memory"
+    memory_dir.mkdir(parents=True)
+    write_json(
+        memory_dir / "mutation_brief.json",
+        {
+            "summary": "Current priority is `evaluation`.",
+            "recommended_action": "targeted_mutation",
+            "target_module": "science_loss",
+            "problem_statement": "Improve transfer-stability evaluation or smoke tests so promising candidates fail earlier before full audit.",
+            "module_rationale": "Recent failures are boundary-transfer specific, so the loss surface is the best next bounded module to adjust.",
+            "supporting_evidence": ["artifacts/memory/hindsight.json"],
+            "verification_plan": ["Run focused tests for the target module and adjacent seams."],
+            "options": [
+                {"kind": "targeted_mutation", "title": "Mutate science_loss", "why": "x", "recommended": True},
+                {"kind": "wait", "title": "Wait on broad mutation", "why": "Need more scored candidates.", "recommended": False},
+            ],
+        },
+    )
+    write_json(
+        memory_dir / "backend_code_map.json",
+        {
+            "summary": "Backend code context is available.",
+            "modules": [
+                {
+                    "module": "science_loss",
+                    "file": "src/harness_lab/science_loss.py",
+                    "purpose": "Loss seam.",
+                    "key_functions": ["compute_instance_loss", "compute_loss"],
+                    "levered_surfaces": ["boundary_loss_weight", "instance_margin"],
+                    "fixed_surfaces": ["Loss recipe"],
+                }
+            ],
+        },
+    )
+
+    payload = build_code_change_brief(memory_dir)
+
+    assert payload["target_module"] == "science_loss"
+    assert payload["target_file"] == "src/harness_lab/science_loss.py"
+    assert "compute_loss" in payload["target_functions"]
+    assert payload["wait_option"]["title"] == "Wait on broad mutation"
+    assert "science_loss" not in payload["target_file"] or payload["proposed_change"]
+
+
+def test_render_code_change_markdown_writes_concrete_sections(tmp_path):
+    repo_dir = tmp_path
+    memory_dir = tmp_path / "artifacts" / "memory"
+    memory_dir.mkdir(parents=True)
+    write_json(
+        memory_dir / "code_change_brief.json",
+        {
+            "summary": "Current priority is `evaluation`.",
+            "recommended_action": "wait",
+            "target_module": "science_loss",
+            "target_file": "src/harness_lab/science_loss.py",
+            "target_functions": ["compute_instance_loss", "compute_loss"],
+            "problem_statement": "Improve transfer stability.",
+            "why_this_module": "Boundary failures point here.",
+            "proposed_change": "Adjust transfer-sensitive loss pressure in a bounded way.",
+            "do_not_change": ["Do not change science_eval thresholds in the same patch."],
+            "acceptance_checks": ["The loss change remains bounded."],
+            "focused_tests": ["tests/test_science_loss.py"],
+            "verification_plan": ["Run focused tests."],
+            "abort_conditions": ["Abort if the patch spreads into unrelated modules."],
+            "wait_option": {"title": "Wait on broad mutation", "why": "Need more scored candidates."},
+            "supporting_evidence": ["artifacts/memory/hindsight.json", "src/harness_lab/science_loss.py"],
+            "note": "Review only.",
+        },
+    )
+
+    path = render_code_change_markdown(repo_dir, memory_dir)
+    text = path.read_text(encoding="utf-8")
+
+    assert "# Code Change Brief" in text
+    assert "## Target Functions" in text
+    assert "src/harness_lab/science_loss.py" in text
+    assert "Wait on broad mutation" in text
 
 
 def test_mutation_brief_recommends_mutation_after_enough_post_change_signal(tmp_path, monkeypatch):
