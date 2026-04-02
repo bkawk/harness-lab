@@ -1,7 +1,7 @@
 # Code Change Brief
 
-- summary: Current priority is `evaluation` with selection mode `stabilize`.
-- recommended_action: `targeted_mutation`
+- summary: Current priority is `evaluation`, but only 1 scored candidate(s) have landed since the last structural change, so broad mutation should wait while conservative lever nudges remain allowed.
+- recommended_action: `wait`
 - target_module: `science_loss`
 - target_file: `src/harness_lab/science_loss.py`
 
@@ -13,10 +13,14 @@
 - Improve transfer-stability evaluation or smoke tests so promising candidates fail earlier before full audit.
 
 ## Why This Module
-- Recent failures are boundary-transfer specific, so the loss surface is the best next bounded module to adjust. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation.
+- Recent failures are boundary-transfer specific, so the loss surface is the best next bounded module to adjust. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation. Hold off on broad mutation until the post-change sample is less thin. Small conservative lever nudges are still allowed. 1 scored candidate(s) have landed since structural commit `7fea1af`.
 
 ## Code Hypothesis
 - The current transfer problem is more likely to improve through stronger transfer-sensitive loss pressure than through changing evaluation thresholds alone.
+
+## Decision State
+- `wait`
+- Only 1 scored candidate(s) have landed since the last structural change; wait on broad mutation until at least 3 post-change scored candidates exist, but conservative lever nudges are still allowed.
 
 ## Proposed Change
 - Increase transfer-sensitive boundary or instance pressure modestly, for example by strengthening boundary_loss_weight or instance_margin, without changing eval thresholds.
@@ -57,7 +61,7 @@
 - Do not silently roll back and hide the failure; instead leave the failed attempt visible to human review.
 
 ## Wait Option
-- Wait on broad mutation: Recent evidence may still be too thin or too noisy for broad mutation, but conservative lever nudges are still allowed while more scored candidates accumulate.
+- Wait on broad mutation: Only 1 scored candidate(s) have landed since the last structural change; wait on broad mutation until at least 3 post-change scored candidates exist, but conservative lever nudges are still allowed.
 
 ## Evidence
 - `artifacts/memory/hindsight.json`
