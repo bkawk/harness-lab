@@ -11,7 +11,7 @@
 - Recent failures are dominated by smoke-gate transfer checks, so the evaluation module is the best next bounded target. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation.
 
 ## Secondary Context
-- Recent real-backend runs are only using about 798.2 MB on average, leaving most VRAM unused. 25 scored candidate(s) have landed since structural commit `49fb173`.
+- Recent real-backend runs are only using about 756.5 MB on average, leaving most VRAM unused. 27 scored candidate(s) have landed since structural commit `49fb173`.
 
 ## Options
 - [Recommended] Mutate science_eval: Recent failures are dominated by smoke-gate transfer checks, so the evaluation module is the best next bounded target. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation.
