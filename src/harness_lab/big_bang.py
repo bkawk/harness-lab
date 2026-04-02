@@ -216,6 +216,8 @@ def render_big_bang_markdown(
     code_change_brief_path = memory_dir / "code_change_brief.json"
     if code_change_brief_path.exists():
         code_change_brief = json.loads(code_change_brief_path.read_text(encoding="utf-8"))
+    code_change_gate = _read_json_file(memory_dir / "code_change_gate.json")
+    code_change_verification = _read_json_file(memory_dir / "code_change_verification.json")
     if backend_module_summary_path.exists():
         backend_module_summary = json.loads(backend_module_summary_path.read_text(encoding="utf-8"))
     backend_code_map_path = memory_dir / "backend_code_map.json"
@@ -323,6 +325,15 @@ def render_big_bang_markdown(
         f"- target_functions: `{', '.join(code_change_brief.get('target_functions', [])[:4]) or '-'}`",
         f"- proposed_change: `{code_change_brief.get('proposed_change', 'No proposed change yet.')}`",
         f"- wait_option: `{code_change_brief.get('wait_option', {}).get('why', 'No wait option recorded yet.')}`",
+    ]
+    code_change_gate_lines = [
+        f"- summary: `{code_change_gate.get('summary', 'No code-change gate generated yet.')}`",
+        f"- recommended_action: `{code_change_gate.get('recommended_action', '-') or '-'}`",
+        f"- target_file: `{code_change_gate.get('target_file', '-') or '-'}`",
+        f"- max_changed_files: `{code_change_gate.get('max_changed_files', '-')}`",
+        f"- allowed_write_files: `{', '.join(code_change_gate.get('allowed_write_files', [])[:6]) or '-'}`",
+        f"- focused_tests: `{', '.join(code_change_gate.get('focused_tests', [])[:4]) or '-'}`",
+        f"- verification_status: `{code_change_verification.get('summary', 'No verification run recorded yet.')}`",
     ]
     backend_science_lines = [
         f"- summary: `{backend_module_summary.get('summary', 'No backend-science summary yet.')}`",
@@ -509,6 +520,9 @@ def render_big_bang_markdown(
             "",
             "### Code Change Brief",
             *code_change_lines,
+            "",
+            "### Code Change Gate",
+            *code_change_gate_lines,
             "",
             "## External Review",
             f"- status: `{external_review.get('status', 'idle')}`",

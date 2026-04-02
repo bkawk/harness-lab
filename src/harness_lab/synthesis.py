@@ -9,6 +9,7 @@ from pathlib import Path
 log = logging.getLogger("harness_lab.synthesis")
 
 from harness_lab.budget import read_budget, write_budget
+from harness_lab.code_change_gate import write_code_change_gate
 from harness_lab.diversity import write_diversity
 from harness_lab.hardware import read_hardware_profile
 from harness_lab.hindsight import read_hindsight, write_hindsight
@@ -406,6 +407,7 @@ def refresh_memory_artifacts(candidates_dir: Path, memory_dir: Path) -> dict:
     write_policy(candidates_dir, memory_dir, memory_dir / "policy.json")
     write_mutation_brief(candidates_dir, memory_dir)
     write_code_change_brief(memory_dir)
+    write_code_change_gate(memory_dir)
     write_budget(memory_dir, memory_dir / "budget.json")
     write_diversity(candidates_dir, memory_dir / "diversity.json")
     synthesize_payload = synthesize_parent_candidates(candidates_dir, memory_dir / "parent_synthesis.json")

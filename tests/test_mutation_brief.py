@@ -113,6 +113,13 @@ def test_build_code_change_brief_uses_code_context(tmp_path):
                     "fixed_surfaces": ["Loss recipe"],
                 }
             ],
+            "failure_to_code_hints": [
+                {
+                    "failure_mode": "boundary_smoke:gap_too_wide",
+                    "likely_modules": ["science_eval", "science_loss"],
+                    "why": "Boundary failures often reflect weak loss pressure or strict eval thresholds.",
+                }
+            ],
         },
     )
 
@@ -121,6 +128,11 @@ def test_build_code_change_brief_uses_code_context(tmp_path):
     assert payload["target_module"] == "science_loss"
     assert payload["target_file"] == "src/harness_lab/science_loss.py"
     assert "compute_loss" in payload["target_functions"]
+    assert "stronger transfer-sensitive loss pressure" in payload["code_hypothesis"]
+    assert "boundary_loss_weight" in payload["proposed_change"]
+    assert payload["failure_to_code_hint"]["failure_mode"] == "boundary_smoke:gap_too_wide"
+    assert "Add, remove, or refactor code" in payload["execution_contract"]["allowed_actions"][0]
+    assert "Do not silently roll back" in payload["execution_contract"]["failure_behavior"][2]
     assert payload["wait_option"]["title"] == "Wait on broad mutation"
     assert "science_loss" not in payload["target_file"] or payload["proposed_change"]
 
@@ -139,7 +151,13 @@ def test_render_code_change_markdown_writes_concrete_sections(tmp_path):
             "target_functions": ["compute_instance_loss", "compute_loss"],
             "problem_statement": "Improve transfer stability.",
             "why_this_module": "Boundary failures point here.",
+            "code_hypothesis": "The current transfer problem is more likely to improve through stronger transfer-sensitive loss pressure than through changing evaluation thresholds alone.",
             "proposed_change": "Adjust transfer-sensitive loss pressure in a bounded way.",
+            "execution_contract": {
+                "allowed_actions": ["Add, remove, or refactor code within the target module."],
+                "scope_limits": ["Keep the write scope to the target module plus adjacent focused tests."],
+                "failure_behavior": ["Abort the attempt if compile checks or focused tests fail."],
+            },
             "do_not_change": ["Do not change science_eval thresholds in the same patch."],
             "acceptance_checks": ["The loss change remains bounded."],
             "focused_tests": ["tests/test_science_loss.py"],
@@ -156,6 +174,9 @@ def test_render_code_change_markdown_writes_concrete_sections(tmp_path):
 
     assert "# Code Change Brief" in text
     assert "## Target Functions" in text
+    assert "## Code Hypothesis" in text
+    assert "## Execution Contract" in text
+    assert "## Failure Behavior" in text
     assert "src/harness_lab/science_loss.py" in text
     assert "Wait on broad mutation" in text
 
