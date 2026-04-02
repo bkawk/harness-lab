@@ -8,13 +8,13 @@
 - Improve transfer-stability evaluation or smoke tests so promising candidates fail earlier before full audit.
 
 ## Why This Module
-- Recent failures are boundary-transfer specific, so the loss surface is the best next bounded module to adjust. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation. Hold off on broad mutation until the post-change sample is less thin. Small conservative lever nudges are still allowed. 0 scored candidate(s) have landed since structural commit `8306434`.
+- Recent failures are boundary-transfer specific, so the loss surface is the best next bounded module to adjust. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation. Hold off on broad mutation until the post-change sample is less thin. Small conservative lever nudges are still allowed. 0 scored candidate(s) have landed since structural commit `4d32d84`.
 
 ## Secondary Context
-- Recent real-backend runs are only using about 678.8 MB on average, leaving most VRAM unused. 0 scored candidate(s) have landed since structural commit `8306434`.
+- Recent real-backend runs are only using about 644.5 MB on average, leaving most VRAM unused. 0 scored candidate(s) have landed since structural commit `4d32d84`.
 
 ## Options
-- [Option] Mutate science_loss: Recent failures are boundary-transfer specific, so the loss surface is the best next bounded module to adjust. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation. Hold off on broad mutation until the post-change sample is less thin. Small conservative lever nudges are still allowed. 0 scored candidate(s) have landed since structural commit `8306434`.
+- [Option] Mutate science_loss: Recent failures are boundary-transfer specific, so the loss surface is the best next bounded module to adjust. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation. Hold off on broad mutation until the post-change sample is less thin. Small conservative lever nudges are still allowed. 0 scored candidate(s) have landed since structural commit `4d32d84`.
 - [Recommended] Wait on broad mutation: Only 0 scored candidate(s) have landed since the last structural change; wait on broad mutation until at least 3 post-change scored candidates exist, but conservative lever nudges are still allowed.
 
 ## Evidence
