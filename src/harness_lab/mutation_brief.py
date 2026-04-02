@@ -268,13 +268,24 @@ def write_mutation_brief(candidates_dir: Path, memory_dir: Path) -> Path:
 
 def _module_change_intent(target_module: str) -> str:
     intents = {
-        "science_model": "Make a narrow representation-capacity or local-context adjustment that improves transfer without changing smoke thresholds or runner behavior.",
-        "science_loss": "Adjust transfer-sensitive loss pressure in a bounded way so boundary and instance structure hold up better on transfer slices.",
-        "science_eval": "Refine smoke or audit classification so severe non-robustness fails earlier while borderline promising runs remain distinguishable.",
-        "science_config": "Change config derivation or seed defaults for the targeted failure mode without broadening the search into unrelated modules.",
-        "science_train": "Change bounded training-capacity behavior, such as batch sizing or logging discipline, without altering model/loss semantics.",
+        "science_model": "Increase or rebalance representation capacity in a narrow way, such as local-context width or neighborhood strength, without touching smoke thresholds or runner behavior.",
+        "science_loss": "Increase transfer-sensitive boundary or instance pressure modestly, for example by strengthening boundary_loss_weight or instance_margin, without changing eval thresholds.",
+        "science_eval": "Tighten or clarify smoke and audit classification so severe non-robustness fails earlier while borderline promising runs remain distinguishable.",
+        "science_config": "Refine failure-conditioned seed defaults or bounded config derivation for the targeted failure mode without broadening into unrelated modules.",
+        "science_train": "Raise bounded train-side capacity, such as batch_size or eval_batch_size, without altering model, loss, or eval semantics.",
     }
     return intents.get(target_module, "Make one narrow, testable change within the targeted backend module.")
+
+
+def _module_code_hypothesis(target_module: str) -> str:
+    hypotheses = {
+        "science_model": "The current transfer problem is more likely to improve through representation-capacity or local-context changes than through threshold-only evaluation changes.",
+        "science_loss": "The current transfer problem is more likely to improve through stronger transfer-sensitive loss pressure than through changing evaluation thresholds alone.",
+        "science_eval": "The current problem is more likely to improve through sharper smoke/audit discrimination than through changing model or loss pressure first.",
+        "science_config": "The current problem is more likely to improve through better seed defaults or bounded config derivation than through a broader refactor.",
+        "science_train": "The current opportunity is more likely to improve through train-side capacity use than through loss or eval changes first.",
+    }
+    return hypotheses.get(target_module, "The current problem is most actionable in the targeted module.")
 
 
 def _module_focused_tests(target_module: str) -> list[str]:
@@ -340,6 +351,29 @@ def _module_do_not_change(target_module: str) -> list[str]:
     return locked.get(target_module, ["Do not broaden the change into unrelated modules in the same patch."])
 
 
+def _execution_contract(target_module: str) -> dict:
+    return {
+        "allowed_actions": [
+            "Add, remove, or refactor code within the target module when that is the smallest clean way to express the bounded change.",
+            "Add or update adjacent focused tests that directly cover the target module change.",
+        ],
+        "scope_limits": [
+            f"Keep the write scope to `{target_module}` plus adjacent focused tests unless the brief explicitly names another seam.",
+            "Do not turn a bounded module change into a multi-module refactor in the same patch.",
+        ],
+        "verification_required": [
+            "Run py_compile for every touched Python source file.",
+            "Run the focused tests named in this brief.",
+            "If the change is intended for live science behavior, verify one real candidate still writes normal science traces and result artifacts.",
+        ],
+        "failure_behavior": [
+            "Abort the attempt if compile checks or focused tests fail.",
+            "Do not auto-publish or auto-promote a failed attempt.",
+            "Do not silently roll back and hide the failure; instead leave the failed attempt visible to human review.",
+        ],
+    }
+
+
 def build_code_change_brief(memory_dir: Path) -> dict:
     brief = read_json(mutation_brief_path(memory_dir)) if mutation_brief_path(memory_dir).exists() else {}
     code_map = read_json(memory_dir / "backend_code_map.json") if (memory_dir / "backend_code_map.json").exists() else {}
@@ -353,10 +387,28 @@ def build_code_change_brief(memory_dir: Path) -> dict:
     focused_tests = _module_focused_tests(target_module)
     acceptance_checks = _module_acceptance_checks(target_module)
     do_not_change = _module_do_not_change(target_module)
+    code_hypothesis = _module_code_hypothesis(target_module)
+    execution_contract = _execution_contract(target_module)
     fixed_surfaces = [str(item).strip() for item in target_context.get("fixed_surfaces", []) if str(item).strip()]
     if fixed_surfaces:
         do_not_change.append(f"Do not rewrite these fixed surfaces in the same patch: {'; '.join(fixed_surfaces[:3])}.")
-    supporting_evidence = list(dict.fromkeys([*(brief.get("supporting_evidence", [])[:6]), str(target_context.get("file", "")).strip()]))
+    failure_hint = next(
+        (
+            item
+            for item in code_map.get("failure_to_code_hints", [])
+            if target_module in [str(name).strip() for name in item.get("likely_modules", [])]
+        ),
+        {},
+    )
+    supporting_evidence = list(
+        dict.fromkeys(
+            [
+                *(brief.get("supporting_evidence", [])[:6]),
+                str(target_context.get("file", "")).strip(),
+                (f"failure_to_code:{failure_hint.get('failure_mode', '')}" if failure_hint else ""),
+            ]
+        )
+    )
     supporting_evidence = [item for item in supporting_evidence if item]
     return {
         "summary": brief.get("summary", "No code-change brief generated yet."),
@@ -366,11 +418,14 @@ def build_code_change_brief(memory_dir: Path) -> dict:
         "target_functions": list(target_context.get("key_functions", [])[:6]),
         "problem_statement": str(brief.get("problem_statement", "")).strip(),
         "why_this_module": str(brief.get("module_rationale", "")).strip(),
+        "code_hypothesis": code_hypothesis,
         "proposed_change": _module_change_intent(target_module),
+        "failure_to_code_hint": failure_hint,
         "do_not_change": do_not_change,
         "acceptance_checks": acceptance_checks,
         "focused_tests": focused_tests,
         "verification_plan": list(brief.get("verification_plan", [])[:6]),
+        "execution_contract": execution_contract,
         "supporting_evidence": supporting_evidence,
         "abort_conditions": [
             "Abort if the change requires touching more than the target module plus adjacent tests.",
@@ -453,6 +508,10 @@ def render_code_change_markdown(repo_dir: Path, memory_dir: Path) -> Path:
     acceptance_lines = [f"- {item}" for item in brief.get("acceptance_checks", [])[:8]] or ["- No acceptance checks recorded yet."]
     test_lines = [f"- `{item}`" for item in brief.get("focused_tests", [])[:6]] or ["- `No focused tests recorded yet.`"]
     verification_lines = [f"- {item}" for item in brief.get("verification_plan", [])[:8]] or ["- No verification plan recorded yet."]
+    contract = brief.get("execution_contract", {})
+    allowed_action_lines = [f"- {item}" for item in contract.get("allowed_actions", [])[:6]] or ["- No allowed actions recorded yet."]
+    scope_limit_lines = [f"- {item}" for item in contract.get("scope_limits", [])[:6]] or ["- No scope limits recorded yet."]
+    failure_behavior_lines = [f"- {item}" for item in contract.get("failure_behavior", [])[:6]] or ["- No failure behavior recorded yet."]
     abort_lines = [f"- {item}" for item in brief.get("abort_conditions", [])[:6]] or ["- No abort conditions recorded yet."]
     wait_option = brief.get("wait_option", {})
     content = "\n".join(
@@ -473,8 +532,17 @@ def render_code_change_markdown(repo_dir: Path, memory_dir: Path) -> Path:
             "## Why This Module",
             f"- {brief.get('why_this_module', 'No module rationale yet.')}",
             "",
+            "## Code Hypothesis",
+            f"- {brief.get('code_hypothesis', 'No code hypothesis yet.')}",
+            "",
             "## Proposed Change",
             *change_lines,
+            "",
+            "## Execution Contract",
+            *allowed_action_lines,
+            "",
+            "## Scope Limits",
+            *scope_limit_lines,
             "",
             "## Do Not Change",
             *do_not_change_lines,
@@ -490,6 +558,9 @@ def render_code_change_markdown(repo_dir: Path, memory_dir: Path) -> Path:
             "",
             "## Abort Conditions",
             *abort_lines,
+            "",
+            "## Failure Behavior",
+            *failure_behavior_lines,
             "",
             "## Wait Option",
             f"- {wait_option.get('title', 'Wait on broad mutation')}: {wait_option.get('why', 'More scored candidates are needed before acting.')}",
