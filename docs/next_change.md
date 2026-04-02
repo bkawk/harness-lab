@@ -1,26 +1,25 @@
 # Next Change
 
-- summary: Current priority is `non_self_evolving` with selection mode `stabilize`.
+- summary: Current priority is `evaluation` with selection mode `stabilize`.
 - recommended_action: `targeted_mutation`
-- target_module: `science_loss`
+- target_module: `science_eval`
 
 ## Problem
-- Consider strengthening the non-self-evolving seed around `hard_transfer_regression` if that failure mode keeps dominating.
+- Improve transfer-stability evaluation or smoke tests so promising candidates fail earlier before full audit.
 
 ## Why This Module
-- Recent failures are boundary-transfer specific, so the loss surface is the best next bounded module to adjust. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation.
+- Recent failures are dominated by smoke-gate transfer checks, so the evaluation module is the best next bounded target. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation.
 
 ## Secondary Context
-- Recent real-backend runs are only using about 830.4 MB on average, leaving most VRAM unused. 23 scored candidate(s) have landed since structural commit `49fb173`.
+- Recent real-backend runs are only using about 798.2 MB on average, leaving most VRAM unused. 25 scored candidate(s) have landed since structural commit `49fb173`.
 
 ## Options
-- [Recommended] Mutate science_loss: Recent failures are boundary-transfer specific, so the loss surface is the best next bounded module to adjust. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation.
+- [Recommended] Mutate science_eval: Recent failures are dominated by smoke-gate transfer checks, so the evaluation module is the best next bounded target. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation.
 - [Option] Wait on broad mutation: Recent evidence may still be too thin or too noisy for broad mutation, but conservative lever nudges are still allowed while more scored candidates accumulate.
 
 ## Evidence
-- `artifacts/memory/candidate_index.json`
 - `artifacts/memory/hindsight.json`
-- `artifacts/memory/policy.json`
+- `artifacts/memory/science_summary.json`
 - `artifacts/memory/backend_module_summary.json`
 
 ## Guardrails
