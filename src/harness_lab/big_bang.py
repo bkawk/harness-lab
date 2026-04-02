@@ -218,6 +218,7 @@ def render_big_bang_markdown(
         code_change_brief = json.loads(code_change_brief_path.read_text(encoding="utf-8"))
     code_change_gate = _read_json_file(memory_dir / "code_change_gate.json")
     code_change_verification = _read_json_file(memory_dir / "code_change_verification.json")
+    autonomous_mutation_gate = _read_json_file(memory_dir / "autonomous_mutation_gate.json")
     if backend_module_summary_path.exists():
         backend_module_summary = json.loads(backend_module_summary_path.read_text(encoding="utf-8"))
     backend_code_map_path = memory_dir / "backend_code_map.json"
@@ -336,6 +337,15 @@ def render_big_bang_markdown(
         f"- allowed_write_files: `{', '.join(code_change_gate.get('allowed_write_files', [])[:6]) or '-'}`",
         f"- focused_tests: `{', '.join(code_change_gate.get('focused_tests', [])[:4]) or '-'}`",
         f"- verification_status: `{code_change_verification.get('summary', 'No verification run recorded yet.')}`",
+    ]
+    autonomous_mutation_lines = [
+        f"- summary: `{autonomous_mutation_gate.get('summary', 'No autonomous-mutation gate generated yet.')}`",
+        f"- eligible: `{autonomous_mutation_gate.get('eligible', False)}`",
+        f"- state: `{autonomous_mutation_gate.get('state', '-') or '-'}`",
+        f"- reason: `{autonomous_mutation_gate.get('reason', 'No autonomous-mutation decision recorded yet.')}`",
+        f"- execution_mode: `{autonomous_mutation_gate.get('execution_mode', '-') or '-'}`",
+        f"- auto_publish: `{autonomous_mutation_gate.get('auto_publish', False)}`",
+        f"- silent_rollback: `{autonomous_mutation_gate.get('silent_rollback', False)}`",
     ]
     backend_science_lines = [
         f"- summary: `{backend_module_summary.get('summary', 'No backend-science summary yet.')}`",
@@ -525,6 +535,9 @@ def render_big_bang_markdown(
             "",
             "### Code Change Gate",
             *code_change_gate_lines,
+            "",
+            "### Autonomous Mutation",
+            *autonomous_mutation_lines,
             "",
             "## External Review",
             f"- status: `{external_review.get('status', 'idle')}`",
