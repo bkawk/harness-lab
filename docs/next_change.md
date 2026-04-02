@@ -11,7 +11,7 @@
 - The top live pressure is unused VRAM headroom, so favor explicit train-capacity moves first. Start with batch_size and eval_batch_size before drifting back to loss tuning. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation.
 
 ## Secondary Context
-- Recent real-backend runs are only using about 764.2 MB on average, leaving most VRAM unused. 19 scored candidate(s) have landed since structural commit `49fb173`.
+- Recent real-backend runs are only using about 793.0 MB on average, leaving most VRAM unused. 21 scored candidate(s) have landed since structural commit `49fb173`.
 
 ## Options
 - [Recommended] Mutate science_train: The top live pressure is unused VRAM headroom, so favor explicit train-capacity moves first. Start with batch_size and eval_batch_size before drifting back to loss tuning. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation.
