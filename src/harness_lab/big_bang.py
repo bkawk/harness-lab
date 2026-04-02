@@ -7,7 +7,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from harness_lab.backend import read_backend_profile, write_backend_profile
+from harness_lab.autonomous_mutation_gate import write_autonomous_mutation_gate
 from harness_lab.budget import read_budget, write_budget
+from harness_lab.code_change_gate import write_code_change_gate
 from harness_lab.diversity import read_diversity, write_diversity
 from harness_lab.external_review import maybe_request_external_review, read_external_review
 from harness_lab.human_feedback import (
@@ -187,6 +189,8 @@ def render_big_bang_markdown(
         write_human_feedback(memory_dir, memory_dir / "human_feedback.json")
         write_mutation_brief(candidates_dir, memory_dir)
         write_code_change_brief(memory_dir)
+        write_code_change_gate(memory_dir)
+        write_autonomous_mutation_gate(memory_dir)
         write_budget(memory_dir, budget_path)
         write_diversity(candidates_dir, diversity_path)
         write_backend_code_map(repo_dir, memory_dir / "backend_code_map.json")
