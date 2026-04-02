@@ -581,3 +581,134 @@ def write_backend_module_summary(candidates_dir: Path, output_path: Path) -> Pat
     payload = build_backend_module_summary(candidates_dir)
     output_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return output_path
+
+
+def build_backend_code_map(repo_dir: Path) -> dict:
+    modules = [
+        {
+            "module": "science_model",
+            "file": "src/harness_lab/science_model.py",
+            "purpose": "Defines the point-cloud model, local-neighborhood aggregation, and representation capacity surface.",
+            "key_functions": ["CompactPointModel.__init__", "CompactPointModel.forward", "knn_indices", "gather_neighbors"],
+            "levered_surfaces": ["hidden_dim", "global_dim", "instance_dim", "k_neighbors", "instance_modulation_scale"],
+            "fixed_surfaces": [
+                "Point encoder and classifier topology",
+                "Fusion layout combining point, local, and global features",
+                "Instance pathway structure and normalization",
+            ],
+            "likely_failure_modes": ["transfer_collapse", "transfer_regression", "hard_transfer_regression", "local_only_gain"],
+        },
+        {
+            "module": "science_loss",
+            "file": "src/harness_lab/science_loss.py",
+            "purpose": "Combines classification, parameter, boundary, and instance-separation losses into the training objective.",
+            "key_functions": ["compute_instance_loss", "compute_loss"],
+            "levered_surfaces": ["param_loss_weight", "boundary_loss_weight", "instance_loss_weight", "instance_margin"],
+            "fixed_surfaces": [
+                "Cross-entropy plus smooth-L1 plus BCE loss recipe",
+                "Instance similarity and same-class negative construction",
+                "Loss-term composition order",
+            ],
+            "likely_failure_modes": ["boundary_transfer_regression", "hard_transfer_regression", "audit_boundary_f1_weak"],
+        },
+        {
+            "module": "science_eval",
+            "file": "src/harness_lab/science_eval.py",
+            "purpose": "Runs smoke-gate and audit outcome classification logic, including hard-fail rules and keeper thresholds.",
+            "key_functions": ["should_run_full_audit", "classify_smoke_block", "classify_outcome"],
+            "levered_surfaces": ["transfer_smoke_min_score", "transfer_smoke_max_gap", "transfer_smoke_min_boundary_f1"],
+            "fixed_surfaces": [
+                "Hard-fail rules for severe smoke regressions",
+                "Keeper/improved/audit_blocked/dead_end classification bands",
+                "Primary failure-mode attribution ordering",
+            ],
+            "likely_failure_modes": [
+                "transfer_smoke:gap_too_wide",
+                "boundary_smoke:gap_too_wide",
+                "hard_transfer_smoke:gap_too_wide",
+                "transfer_smoke_score_below_floor",
+            ],
+        },
+        {
+            "module": "science_config",
+            "file": "src/harness_lab/science_config.py",
+            "purpose": "Builds effective backend settings from proposal context, failure-mode-conditioned defaults, and bounded lever overrides.",
+            "key_functions": ["derive_config", "apply_oom_backoff", "deterministic_index"],
+            "levered_surfaces": [
+                "lr",
+                "weight_decay",
+                "time_budget_seconds",
+                "eval_reserve_seconds",
+                "hidden_dim",
+                "global_dim",
+                "instance_dim",
+                "k_neighbors",
+                "batch_size",
+                "eval_batch_size",
+            ],
+            "fixed_surfaces": [
+                "Heuristic choice sets for config derivation",
+                "Failure-mode-conditioned seed strengthening",
+                "Environment override handling and OOM backoff path",
+            ],
+            "likely_failure_modes": ["vram_headroom", "vram_pressure", "hard_transfer_regression", "boundary_smoke:gap_too_wide"],
+        },
+        {
+            "module": "science_train",
+            "file": "src/harness_lab/science_train.py",
+            "purpose": "Owns the wall-clock training loop, progress tracing, benchmark/smoke/audit order, and final evidence assembly.",
+            "key_functions": ["run_training_cycle", "write_science_progress", "peak_vram_mb"],
+            "levered_surfaces": ["batch_size", "eval_batch_size", "grad_clip", "log_interval"],
+            "fixed_surfaces": [
+                "Time-based training schedule and eval reserve discipline",
+                "Benchmark -> smoke -> audit execution order",
+                "Evidence and trace writing for science outcomes",
+            ],
+            "likely_failure_modes": ["training_consumes_wall_clock_before_eval", "vram_headroom", "stale_process", "undertrained"],
+        },
+    ]
+    failure_to_code_hints = [
+        {
+            "failure_mode": "boundary_smoke:gap_too_wide",
+            "likely_modules": ["science_eval", "science_loss", "science_model"],
+            "why": "Boundary smoke regressions often reflect a mix of strict smoke-gap thresholds, weak boundary pressure in the loss, or insufficient boundary-sensitive representation capacity.",
+        },
+        {
+            "failure_mode": "hard_transfer_regression",
+            "likely_modules": ["science_loss", "science_model", "science_config"],
+            "why": "Hard-transfer failures usually point to brittle transfer-sensitive structure, insufficient representation robustness, or seed defaults that underweight difficult cases.",
+        },
+        {
+            "failure_mode": "transfer_smoke:gap_too_wide",
+            "likely_modules": ["science_eval", "science_model"],
+            "why": "A wide benchmark-to-smoke gap is often governed by smoke gate strictness and by whether the model capacity generalizes beyond the local benchmark slice.",
+        },
+        {
+            "failure_mode": "transfer_collapse",
+            "likely_modules": ["science_model", "science_loss", "science_eval"],
+            "why": "Transfer collapse typically indicates the model or loss is learning local-only wins that the audit and smoke logic later reject.",
+        },
+        {
+            "failure_mode": "vram_headroom",
+            "likely_modules": ["science_train", "science_model", "science_config"],
+            "why": "Unused VRAM is mostly controlled by batch sizing, model width, and the config layer that selects bounded defaults before lever overrides.",
+        },
+    ]
+    summary = (
+        "Backend code context maps the five modular science seams to their key functions, bounded lever surfaces, "
+        "fixed implementation surfaces, and likely failure-mode touchpoints."
+    )
+    return {
+        "summary": summary,
+        "repo_root": str(repo_dir),
+        "module_count": len(modules),
+        "modules": modules,
+        "failure_to_code_hints": failure_to_code_hints,
+    }
+
+
+def write_backend_code_map(repo_dir: Path, output_path: Path) -> Path:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    payload = build_backend_code_map(repo_dir)
+    output_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return output_path

@@ -17,7 +17,7 @@ from harness_lab.human_feedback import (
     write_human_feedback,
 )
 from harness_lab.hindsight import write_hindsight
-from harness_lab.memory import build_candidate_index
+from harness_lab.memory import build_candidate_index, write_backend_code_map
 from harness_lab.mutation_brief import render_next_change_markdown, write_mutation_brief
 from harness_lab.orchestrator import GENESIS_CANDIDATE_ID, LabStepResult, next_candidate_id, run_lab_step
 from harness_lab.policy import read_policy, write_policy
@@ -164,6 +164,7 @@ def render_big_bang_markdown(
     science_summary = {}
     mutation_brief = {}
     backend_module_summary = {}
+    backend_code_map = {}
     live_command = {}
     if candidates_dir.exists():
         write_hindsight(candidates_dir, hindsight_path)
@@ -173,6 +174,7 @@ def render_big_bang_markdown(
         write_mutation_brief(candidates_dir, memory_dir)
         write_budget(memory_dir, budget_path)
         write_diversity(candidates_dir, diversity_path)
+        write_backend_code_map(repo_dir, memory_dir / "backend_code_map.json")
         from harness_lab.memory import write_science_summary
 
         write_science_summary(candidates_dir, science_summary_path)
@@ -197,6 +199,9 @@ def render_big_bang_markdown(
         mutation_brief = json.loads(mutation_brief_path.read_text(encoding="utf-8"))
     if backend_module_summary_path.exists():
         backend_module_summary = json.loads(backend_module_summary_path.read_text(encoding="utf-8"))
+    backend_code_map_path = memory_dir / "backend_code_map.json"
+    if backend_code_map_path.exists():
+        backend_code_map = json.loads(backend_code_map_path.read_text(encoding="utf-8"))
     active_candidate_id = str(state.get("active_candidate_id", "") or "")
     if active_candidate_id:
         live_command_path = candidates_dir / active_candidate_id / "traces" / "live_command.json"
@@ -270,6 +275,34 @@ def render_big_bang_markdown(
         )
     if not backend_module_lines:
         backend_module_lines = ["- no backend module summary yet"]
+    code_context_lines = [f"- summary: `{backend_code_map.get('summary', 'No backend code context yet.')}`"]
+    target_module_context = next(
+        (
+            item
+            for item in backend_code_map.get("modules", [])
+            if str(item.get("module", "")).strip() == target_module
+        ),
+        {},
+    )
+    if target_module_context:
+        code_context_lines.extend(
+            [
+                f"- target_file: `{target_module_context.get('file', '-')}`",
+                f"- target_purpose: `{target_module_context.get('purpose', '-')}`",
+                f"- key_functions: `{', '.join(target_module_context.get('key_functions', [])[:4])}`",
+                f"- levered_surfaces: `{', '.join(target_module_context.get('levered_surfaces', [])[:6])}`",
+                f"- fixed_surfaces: `{'; '.join(target_module_context.get('fixed_surfaces', [])[:3])}`",
+            ]
+        )
+    else:
+        code_context_lines.append("- target_module code context is not available yet")
+    failure_hint_lines = []
+    for item in backend_code_map.get("failure_to_code_hints", [])[:3]:
+        failure_hint_lines.append(
+            f"- `{item.get('failure_mode', '-')}` -> `{', '.join(item.get('likely_modules', [])[:3])}`: `{item.get('why', '')}`"
+        )
+    if not failure_hint_lines:
+        failure_hint_lines = ["- no failure-to-code hints yet"]
     backend_science_lines = [
         f"- summary: `{backend_module_summary.get('summary', 'No backend-science summary yet.')}`",
         f"- recommended_action: `{mutation_brief.get('recommended_action', 'wait')}`",
@@ -446,6 +479,12 @@ def render_big_bang_markdown(
             "",
             "### Recent Module Evidence",
             *backend_module_lines,
+            "",
+            "### Code Context",
+            *code_context_lines,
+            "",
+            "### Failure-To-Code Hints",
+            *failure_hint_lines,
             "",
             "## External Review",
             f"- status: `{external_review.get('status', 'idle')}`",

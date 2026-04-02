@@ -107,6 +107,7 @@ def build_decision_bundle(
     science_summary = read_json(memory_dir / "science_summary.json") if (memory_dir / "science_summary.json").exists() else {}
     science_debug_summary = read_json(memory_dir / "science_debug_summary.json") if (memory_dir / "science_debug_summary.json").exists() else {}
     backend_module_summary = read_json(memory_dir / "backend_module_summary.json") if (memory_dir / "backend_module_summary.json").exists() else {}
+    backend_code_map = read_json(memory_dir / "backend_code_map.json") if (memory_dir / "backend_code_map.json").exists() else {}
     hindsight = read_hindsight(memory_dir)
     policy = read_policy(memory_dir)
     budget = read_budget(memory_dir)
@@ -157,6 +158,11 @@ def build_decision_bundle(
         "science_summary": science_summary,
         "science_debug_summary": science_debug_summary,
         "backend_module_summary": backend_module_summary,
+        "backend_code_map": {
+            "summary": backend_code_map.get("summary", ""),
+            "modules": backend_code_map.get("modules", [])[:5],
+            "failure_to_code_hints": backend_code_map.get("failure_to_code_hints", [])[:5],
+        },
         "backend_lever_catalog": _backend_lever_catalog(),
         "leaders": science_summary.get("leaders", {}),
         "recent_scored_candidates": finished_scored[-5:],
@@ -231,6 +237,7 @@ def build_bootstrap_snapshot(
     science_summary = read_json(memory_dir / "science_summary.json") if (memory_dir / "science_summary.json").exists() else {}
     science_debug_summary = read_json(memory_dir / "science_debug_summary.json") if (memory_dir / "science_debug_summary.json").exists() else {}
     backend_module_summary = read_json(memory_dir / "backend_module_summary.json") if (memory_dir / "backend_module_summary.json").exists() else {}
+    backend_code_map = read_json(memory_dir / "backend_code_map.json") if (memory_dir / "backend_code_map.json").exists() else {}
     hindsight = read_hindsight(memory_dir)
     policy = read_policy(memory_dir)
     budget = read_budget(memory_dir)
@@ -281,6 +288,11 @@ def build_bootstrap_snapshot(
         "backend_module_summary": {
             "summary": backend_module_summary.get("summary", ""),
             "modules": backend_module_summary.get("modules", [])[:4],
+        },
+        "backend_code_map": {
+            "summary": backend_code_map.get("summary", ""),
+            "modules": backend_code_map.get("modules", [])[:5],
+            "failure_to_code_hints": backend_code_map.get("failure_to_code_hints", [])[:4],
         },
         "backend_lever_catalog": _backend_lever_catalog(),
         "hindsight_summary": hindsight.get("summary", ""),

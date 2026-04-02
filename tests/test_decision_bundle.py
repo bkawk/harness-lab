@@ -72,6 +72,29 @@ def test_decision_bundle_separates_scored_pending_and_stalled(tmp_path, monkeypa
     write_json(memory_dir / "candidate_index.json", {"candidate_count": 0, "candidates": []})
     write_json(memory_dir / "science_summary.json", {"leaders": {}, "recent_trend": {}, "trend_summary": ""})
     write_json(
+        memory_dir / "backend_code_map.json",
+        {
+            "summary": "Backend code context is available.",
+            "modules": [
+                {
+                    "module": "science_model",
+                    "file": "src/harness_lab/science_model.py",
+                    "purpose": "Model seam.",
+                    "key_functions": ["CompactPointModel.forward"],
+                    "levered_surfaces": ["hidden_dim"],
+                    "fixed_surfaces": ["classifier topology"],
+                }
+            ],
+            "failure_to_code_hints": [
+                {
+                    "failure_mode": "transfer_collapse",
+                    "likely_modules": ["science_model", "science_loss"],
+                    "why": "Model and loss both matter.",
+                }
+            ],
+        },
+    )
+    write_json(
         memory_dir / "science_debug_summary.json",
         {
             "summary": "Recent candidates are training up to the wall-clock limit without writing result artifacts.",
@@ -97,3 +120,5 @@ def test_decision_bundle_separates_scored_pending_and_stalled(tmp_path, monkeypa
     assert bundle["science_progress"]["phase"] == "training"
     assert bundle["science_progress"]["steps"] == 200
     assert bundle["science_debug_summary"]["likely_issue"] == "training_consumes_wall_clock_before_eval"
+    assert bundle["backend_code_map"]["summary"] == "Backend code context is available."
+    assert bundle["backend_code_map"]["modules"][0]["module"] == "science_model"
