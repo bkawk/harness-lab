@@ -1,25 +1,26 @@
 # Next Change
 
-- summary: Current priority is `evaluation` with selection mode `stabilize`.
+- summary: Current priority is `module_surface` with selection mode `stabilize`.
 - recommended_action: `targeted_mutation`
 - target_module: `science_loss`
 
 ## Problem
-- Improve transfer-stability evaluation or smoke tests so promising candidates fail earlier before full audit.
+- Consider exposing `science_loss` as a more explicit evolvable backend module if it keeps dominating search.
 
 ## Why This Module
 - Recent failures are boundary-transfer specific, so the loss surface is the best next bounded module to adjust. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation.
 
 ## Secondary Context
-- Recent real-backend runs are only using about 645.2 MB on average, leaving most VRAM unused. 35 scored candidate(s) have landed since structural commit `d21d25b`.
+- Recent real-backend runs are only using about 707.0 MB on average, leaving most VRAM unused. 37 scored candidate(s) have landed since structural commit `d21d25b`.
 
 ## Options
 - [Recommended] Mutate science_loss: Recent failures are boundary-transfer specific, so the loss surface is the best next bounded module to adjust. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation.
 - [Option] Wait on broad mutation: Recent evidence may still be too thin or too noisy for broad mutation, but conservative lever nudges are still allowed while more scored candidates accumulate.
 
 ## Evidence
+- `artifacts/memory/candidate_index.json`
 - `artifacts/memory/hindsight.json`
-- `artifacts/memory/science_summary.json`
+- `artifacts/memory/policy.json`
 - `artifacts/memory/backend_module_summary.json`
 
 ## Guardrails
