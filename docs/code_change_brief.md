@@ -21,7 +21,7 @@
 
 ## Decision State
 - `iterate`
-- `science_train` is already the active recent seam with outcomes ['keeper', 'dead_end', 'keeper', 'audit_blocked'], so keep iterating on that line rather than issuing a brand-new brief.
+- `science_train` is already the active recent seam with outcomes ['keeper', 'dead_end', 'keeper', 'audit_blocked', 'dead_end'], so keep iterating on that line rather than issuing a brand-new brief.
 
 ## Proposed Change
 - Raise bounded train-side capacity, such as batch_size or eval_batch_size, without altering model, loss, or eval semantics.
