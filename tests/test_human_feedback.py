@@ -61,6 +61,36 @@ def test_human_feedback_adds_transfer_and_ops_requests(tmp_path):
     assert "dataset" in kinds
 
 
+def test_human_feedback_suppresses_evaluation_when_keepers_match_audit_blocked(tmp_path):
+    memory_dir = tmp_path / "memory"
+    memory_dir.mkdir(parents=True, exist_ok=True)
+    write_json(memory_dir / "external_review.json", {"status": "idle", "human_advice": []})
+    write_json(
+        memory_dir / "hindsight.json",
+        {
+            "top_outcomes": [{"label": "audit_blocked", "count": 20}],
+            "top_failure_modes": [],
+            "recent_scored_candidate_count": 8,
+            "recent_top_outcomes": [
+                {"label": "audit_blocked", "count": 3},
+                {"label": "keeper", "count": 3},
+                {"label": "dead_end", "count": 2},
+            ],
+            "recent_top_failure_modes": [],
+            "summary": "",
+            "hindsight_findings": [],
+            "policy_adjustments": [],
+        },
+    )
+    write_json(memory_dir / "policy.json", {"summary": "Prioritize transfer stability."})
+    write_json(memory_dir / "science_summary.json", {"leaders": {"best_stable": {"candidate_id": "cand_0455"}}})
+
+    payload = build_human_feedback(memory_dir)
+    kinds = [item["kind"] for item in payload["items"]]
+
+    assert "evaluation" not in kinds
+
+
 def test_human_feedback_lowers_priority_for_recently_addressed_requests(tmp_path, monkeypatch):
     memory_dir = tmp_path / "memory"
     memory_dir.mkdir(parents=True, exist_ok=True)

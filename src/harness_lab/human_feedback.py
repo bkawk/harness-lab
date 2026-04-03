@@ -297,7 +297,10 @@ def build_human_feedback(memory_dir: Path) -> dict:
     best_stable = leaders.get("best_stable", {})
 
     audit_blocked_count = recent_top_outcomes.get("audit_blocked", 0)
-    if audit_blocked_count >= 3:
+    recent_keeper_count = recent_top_outcomes.get("keeper", 0)
+    recent_dead_end_count = recent_top_outcomes.get("dead_end", 0)
+    evaluation_dominates_frontier = audit_blocked_count >= 3 and audit_blocked_count > recent_keeper_count
+    if evaluation_dominates_frontier:
         response = response_by_kind.get("evaluation")
         persistence = bool(response) and audit_blocked_count >= 6
         items.append(
@@ -305,7 +308,8 @@ def build_human_feedback(memory_dir: Path) -> dict:
                 "kind": "evaluation",
                 "summary": "Improve transfer-stability evaluation or smoke tests so promising candidates fail earlier before full audit.",
                 "why_now": (
-                    f"{audit_blocked_count} audit-blocked outcomes are dominating the frontier."
+                    f"{audit_blocked_count} audit-blocked outcomes are dominating the frontier"
+                    f" over {recent_keeper_count} keeper and {recent_dead_end_count} dead-end outcomes."
                     + (
                         f" The pressure persists after {str(response.get('commit_sha', ''))[:7]}."
                         if persistence
@@ -465,7 +469,7 @@ def build_human_feedback(memory_dir: Path) -> dict:
             and (
                 (
                     item["kind"] == "evaluation"
-                    and audit_blocked_count == 0
+                    and not evaluation_dominates_frontier
                 )
                 or (
                     item["kind"] == "ops"
