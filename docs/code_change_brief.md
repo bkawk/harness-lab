@@ -20,7 +20,7 @@
 
 ## Decision State
 - `iterate`
-- `science_loss` is already the active recent seam with outcomes ['keeper', 'audit_blocked', 'audit_blocked'], so keep iterating on that line rather than issuing a brand-new brief.
+- `science_loss` is already the active recent seam with outcomes ['keeper', 'audit_blocked', 'audit_blocked', 'dead_end'], so keep iterating on that line rather than issuing a brand-new brief.
 
 ## Proposed Change
 - Increase transfer-sensitive boundary or instance pressure modestly, for example by strengthening boundary_loss_weight or instance_margin, without changing eval thresholds.
