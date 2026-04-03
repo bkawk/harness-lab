@@ -1,51 +1,49 @@
 # Code Change Brief
 
-- summary: Current priority is `evaluation` with selection mode `stabilize`.
-- recommended_action: `targeted_mutation`
-- target_module: `science_eval`
-- target_file: `src/harness_lab/science_eval.py`
+- summary: Current priority is `evaluation`, but only 0 scored candidate(s) have landed since the last structural change, so broad mutation should wait while conservative lever nudges remain allowed.
+- recommended_action: `wait`
+- target_module: `science_loss`
+- target_file: `src/harness_lab/science_loss.py`
 
 ## Target Functions
-- `should_run_full_audit`
-- `classify_smoke_block`
-- `classify_outcome`
+- `compute_instance_loss`
+- `compute_loss`
 
 ## Problem
 - Improve transfer-stability evaluation or smoke tests so promising candidates fail earlier before full audit.
 
 ## Why This Module
-- Recent failures are dominated by smoke-gate transfer checks, so the evaluation module is the best next bounded target. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation.
+- Recent failures are boundary-transfer specific, so the loss surface is the best next bounded module to adjust. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation. Hold off on broad mutation until the post-change sample is less thin. Small conservative lever nudges are still allowed. The last structural change could not be identified, so recent-signal gating is conservative.
 
 ## Code Hypothesis
-- The current problem is more likely to improve through sharper smoke/audit discrimination than through changing model or loss pressure first.
+- The current transfer problem is more likely to improve through stronger transfer-sensitive loss pressure than through changing evaluation thresholds alone.
 
 ## Decision State
-- `issue`
-- `science_eval` is the top bounded seam and is not yet saturated by recent same-seam activity, so issue a fresh code-change brief.
+- `wait`
+- Recent evidence may still be too thin or too noisy for broad mutation, but conservative lever nudges are still allowed while more scored candidates accumulate.
 
 ## Proposed Change
-- Tighten or clarify smoke and audit classification so severe non-robustness fails earlier while borderline promising runs remain distinguishable.
+- Increase transfer-sensitive boundary or instance pressure modestly, for example by strengthening boundary_loss_weight or instance_margin, without changing eval thresholds.
 
 ## Execution Contract
 - Add, remove, or refactor code within the target module when that is the smallest clean way to express the bounded change.
 - Add or update adjacent focused tests that directly cover the target module change.
 
 ## Scope Limits
-- Keep the write scope to `science_eval` plus adjacent focused tests unless the brief explicitly names another seam.
+- Keep the write scope to `science_loss` plus adjacent focused tests unless the brief explicitly names another seam.
 - Do not turn a bounded module change into a multi-module refactor in the same patch.
 
 ## Do Not Change
-- Do not change model or loss behavior in the same patch.
-- Do not modify dataset preparation or runner backend behavior.
-- Do not rewrite these fixed surfaces in the same patch: Hard-fail rules for severe smoke regressions; Keeper/improved/audit_blocked/dead_end classification bands; Primary failure-mode attribution ordering.
+- Do not change science_eval thresholds in the same patch.
+- Do not broaden into model architecture rewrites or dataset changes.
+- Do not rewrite these fixed surfaces in the same patch: Cross-entropy plus smooth-L1 plus BCE loss recipe; Instance similarity and same-class negative construction; Loss-term composition order.
 
 ## Acceptance Checks
-- The eval change distinguishes severe failures earlier without collapsing moderate candidates into dead_end too aggressively.
-- Smoke and audit traces should still be written normally for eligible candidates.
+- The loss change remains bounded to transfer-sensitive pressure and does not silently rewrite evaluation logic.
+- The next real candidate should produce clearer transfer behavior without breaking trace emission or outcome writing.
 
 ## Focused Tests
-- `tests/test_science_smoke_gate.py`
-- `tests/test_science_eval.py`
+- `tests/test_science_loss.py`
 
 ## Verification
 - Run focused tests for the target module and adjacent seams.
@@ -69,7 +67,7 @@
 - `artifacts/memory/hindsight.json`
 - `artifacts/memory/science_summary.json`
 - `artifacts/memory/backend_module_summary.json`
-- `src/harness_lab/science_eval.py`
+- `src/harness_lab/science_loss.py`
 - `failure_to_code:boundary_smoke:gap_too_wide`
 
 ## Note
