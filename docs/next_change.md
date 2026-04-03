@@ -1,25 +1,26 @@
 # Next Change
 
-- summary: Current priority is `vram_headroom` with selection mode `stabilize`.
+- summary: Current priority is `module_surface` with selection mode `stabilize`.
 - recommended_action: `targeted_mutation`
-- target_module: `science_train`
+- target_module: `science_loss`
 
 ## Problem
-- Consider increasing batch size or model capacity so the science backend uses more of the available VRAM.
+- Consider exposing `science_train` as a more explicit evolvable backend module if it keeps dominating search.
 
 ## Why This Module
-- The top live pressure is unused VRAM headroom, so favor explicit train-capacity moves first. Start with batch_size and eval_batch_size before drifting back to loss tuning. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation.
+- Recent failures are boundary-transfer specific, so the loss surface is the best next bounded module to adjust. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation.
 
 ## Secondary Context
-- Recent real-backend runs are only using about 939.5 MB on average, leaving most VRAM unused. 11 scored candidate(s) have landed since structural commit `d21d25b`.
+- Recent real-backend runs are only using about 901.6 MB on average, leaving most VRAM unused. 13 scored candidate(s) have landed since structural commit `d21d25b`.
 
 ## Options
-- [Recommended] Mutate science_train: The top live pressure is unused VRAM headroom, so favor explicit train-capacity moves first. Start with batch_size and eval_batch_size before drifting back to loss tuning. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation.
+- [Recommended] Mutate science_loss: Recent failures are boundary-transfer specific, so the loss surface is the best next bounded module to adjust. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation.
 - [Option] Wait on broad mutation: Recent evidence may still be too thin or too noisy for broad mutation, but conservative lever nudges are still allowed while more scored candidates accumulate.
 
 ## Evidence
-- `artifacts/memory/science_debug_summary.json`
-- `artifacts/memory/hardware_profile.json`
+- `artifacts/memory/candidate_index.json`
+- `artifacts/memory/hindsight.json`
+- `artifacts/memory/policy.json`
 - `artifacts/memory/backend_module_summary.json`
 
 ## Guardrails
