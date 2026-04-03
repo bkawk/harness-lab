@@ -19,8 +19,8 @@
 - The current transfer problem is more likely to improve through stronger transfer-sensitive loss pressure than through changing evaluation thresholds alone.
 
 ## Decision State
-- `switch`
-- `science_loss` is already active in the recent scored window but is repeating dead-end outcomes without a keeper signal, so switch seams instead of issuing another brief here.
+- `iterate`
+- `science_loss` is already the active recent seam with outcomes ['dead_end', 'audit_blocked', 'keeper'], so keep iterating on that line rather than issuing a brand-new brief.
 
 ## Proposed Change
 - Increase transfer-sensitive boundary or instance pressure modestly, for example by strengthening boundary_loss_weight or instance_margin, without changing eval thresholds.
