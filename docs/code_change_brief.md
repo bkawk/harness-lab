@@ -1,51 +1,50 @@
 # Code Change Brief
 
-- summary: Current priority is `evaluation`, but only 0 scored candidate(s) have landed since the last structural change, so broad mutation should wait while conservative lever nudges remain allowed.
+- summary: Current priority is `vram_headroom`, but only 0 scored candidate(s) have landed since the last structural change, so broad mutation should wait while conservative lever nudges remain allowed.
 - recommended_action: `wait`
-- target_module: `science_eval`
-- target_file: `src/harness_lab/science_eval.py`
+- target_module: `science_train`
+- target_file: `src/harness_lab/science_train.py`
 
 ## Target Functions
-- `should_run_full_audit`
-- `classify_smoke_block`
-- `classify_outcome`
+- `run_training_cycle`
+- `write_science_progress`
+- `peak_vram_mb`
 
 ## Problem
-- Improve transfer-stability evaluation or smoke tests so promising candidates fail earlier before full audit.
+- Consider increasing batch size or model capacity so the science backend uses more of the available VRAM.
 
 ## Why This Module
-- Recent failures are dominated by smoke-gate transfer checks, so the evaluation module is the best next bounded target. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation. Hold off on broad mutation until the post-change sample is less thin. Small conservative lever nudges are still allowed. The last structural change could not be identified, so recent-signal gating is conservative.
+- The top live pressure is unused VRAM headroom, so favor explicit train-capacity moves first. Start with batch_size and eval_batch_size before drifting back to loss tuning. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation. Hold off on broad mutation until the post-change sample is less thin. Small conservative lever nudges are still allowed. The last structural change could not be identified, so recent-signal gating is conservative.
 
 ## Code Hypothesis
-- The current problem is more likely to improve through sharper smoke/audit discrimination than through changing model or loss pressure first.
+- The current opportunity is more likely to improve through train-side capacity use than through loss or eval changes first.
 
 ## Decision State
 - `wait`
 - Recent evidence may still be too thin or too noisy for broad mutation, but conservative lever nudges are still allowed while more scored candidates accumulate.
 
 ## Proposed Change
-- Tighten or clarify smoke and audit classification so severe non-robustness fails earlier while borderline promising runs remain distinguishable.
+- Raise bounded train-side capacity, such as batch_size or eval_batch_size, without altering model, loss, or eval semantics.
 
 ## Execution Contract
 - Add, remove, or refactor code within the target module when that is the smallest clean way to express the bounded change.
 - Add or update adjacent focused tests that directly cover the target module change.
 
 ## Scope Limits
-- Keep the write scope to `science_eval` plus adjacent focused tests unless the brief explicitly names another seam.
+- Keep the write scope to `science_train` plus adjacent focused tests unless the brief explicitly names another seam.
 - Do not turn a bounded module change into a multi-module refactor in the same patch.
 
 ## Do Not Change
-- Do not change model or loss behavior in the same patch.
-- Do not modify dataset preparation or runner backend behavior.
-- Do not rewrite these fixed surfaces in the same patch: Hard-fail rules for severe smoke regressions; Keeper/improved/audit_blocked/dead_end classification bands; Primary failure-mode attribution ordering.
+- Do not change science_eval or loss semantics in the same patch.
+- Do not remove progress, metrics, or backend result traces.
+- Do not rewrite these fixed surfaces in the same patch: Time-based training schedule and eval reserve discipline; Benchmark -> smoke -> audit execution order; Evidence and trace writing for science outcomes.
 
 ## Acceptance Checks
-- The eval change distinguishes severe failures earlier without collapsing moderate candidates into dead_end too aggressively.
-- Smoke and audit traces should still be written normally for eligible candidates.
+- The train change should visibly alter effective batch/log settings without breaking wall-clock reserve discipline.
+- The next candidate should still write progress and result artifacts through the normal command backend.
 
 ## Focused Tests
-- `tests/test_science_smoke_gate.py`
-- `tests/test_science_eval.py`
+- `tests/test_science_train.py`
 
 ## Verification
 - Run focused tests for the target module and adjacent seams.
@@ -66,11 +65,11 @@
 - Wait on broad mutation: Recent evidence may still be too thin or too noisy for broad mutation, but conservative lever nudges are still allowed while more scored candidates accumulate.
 
 ## Evidence
-- `artifacts/memory/hindsight.json`
-- `artifacts/memory/science_summary.json`
+- `artifacts/memory/science_debug_summary.json`
+- `artifacts/memory/hardware_profile.json`
 - `artifacts/memory/backend_module_summary.json`
-- `src/harness_lab/science_eval.py`
-- `failure_to_code:boundary_smoke:gap_too_wide`
+- `src/harness_lab/science_train.py`
+- `failure_to_code:vram_headroom`
 
 ## Note
 - This brief is generated for review only. It should sharpen code-change planning, not authorize autonomous code edits.
