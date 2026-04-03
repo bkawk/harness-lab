@@ -19,8 +19,8 @@
 - The current transfer problem is more likely to improve through stronger transfer-sensitive loss pressure than through changing evaluation thresholds alone.
 
 ## Decision State
-- `issue`
-- `science_loss` is the top bounded seam and is not yet saturated by recent same-seam activity, so issue a fresh code-change brief.
+- `iterate`
+- `science_loss` is already the active recent seam with outcomes ['dead_end', 'keeper'], so keep iterating on that line rather than issuing a brand-new brief.
 
 ## Proposed Change
 - Increase transfer-sensitive boundary or instance pressure modestly, for example by strengthening boundary_loss_weight or instance_margin, without changing eval thresholds.
