@@ -11,7 +11,7 @@
 - The top live pressure is unused VRAM headroom, so favor explicit train-capacity moves first. Start with batch_size and eval_batch_size before drifting back to loss tuning. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation. Hold off on broad mutation until the post-change sample is less thin. Small conservative lever nudges are still allowed. The last structural change could not be identified, so recent-signal gating is conservative.
 
 ## Secondary Context
-- Recent real-backend runs are only using about 835.8 MB on average, leaving most VRAM unused. The last structural change could not be identified, so recent-signal gating is conservative.
+- Recent real-backend runs are only using about 879.5 MB on average, leaving most VRAM unused. The last structural change could not be identified, so recent-signal gating is conservative.
 
 ## Options
 - [Option] Mutate science_train: The top live pressure is unused VRAM headroom, so favor explicit train-capacity moves first. Start with batch_size and eval_batch_size before drifting back to loss tuning. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation. Hold off on broad mutation until the post-change sample is less thin. Small conservative lever nudges are still allowed. The last structural change could not be identified, so recent-signal gating is conservative.
