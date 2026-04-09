@@ -6,10 +6,10 @@ The GitHub repo is the lab dashboard.
 - status: `running`
 - vital_spark_at: `2026-03-31T10:12:12+00:00`
 - started_at: `2026-04-02T20:24:39+00:00`
-- last_heartbeat: `2026-04-09T18:01:57+00:00`
-- cycles_completed: `892`
+- last_heartbeat: `2026-04-09T18:23:57+00:00`
+- cycles_completed: `894`
 - genesis seed: `cand_0001`
-- last candidate: `cand_1316`
+- last candidate: `cand_1318`
 - last dataset: `abc_boundary512`
 - last commit: `-`
 - last publish message: `Publishing skipped.`
@@ -17,7 +17,7 @@ The GitHub repo is the lab dashboard.
 - novelty cycles triggered: `135`
 
 ## Latest Step
-- candidate: `cand_1316`
+- candidate: `cand_1318`
 - dataset: `abc_boundary512` via `reused_prepared_dataset`
 - seed action: `existing`
 - proposal status: `candidate`
@@ -29,19 +29,19 @@ The GitHub repo is the lab dashboard.
 - cycle mode: `normal_cycle`
 
 ## Active Backend
-- active_candidate: `cand_1316`
+- active_candidate: `cand_1318`
 - backend_status: `finished`
-- backend_pid: `2851859`
-- backend_started_at: `2026-04-09T17:51:54+00:00`
-- backend_last_poll_at: `2026-04-09T18:01:55+00:00`
+- backend_pid: `2852243`
+- backend_started_at: `2026-04-09T18:13:54+00:00`
+- backend_last_poll_at: `2026-04-09T18:23:56+00:00`
 - backend_poll_interval_seconds: `1.0`
 
 ## Recent Candidates
+- `cand_1318`: outcome `dead_end`; diagnosis `complete`; benchmark `0.4379193912321031`
+- `cand_1317`: outcome `dead_end`; diagnosis `complete`; benchmark `0.3599382462725508`
 - `cand_1316`: outcome `dead_end`; diagnosis `complete`; benchmark `0.3181353039776645`
 - `cand_1315`: outcome `dead_end`; diagnosis `complete`; benchmark `0.31493273439715996`
 - `cand_1314`: outcome `dead_end`; diagnosis `complete`; benchmark `0.3159832781699095`
-- `cand_1313`: outcome `audit_blocked`; diagnosis `complete`; benchmark `0.3200544326425396`
-- `cand_1312`: outcome `audit_blocked`; diagnosis `complete`; benchmark `0.31181617892505586`
 
 ## Science Leaders
 - best benchmark: `cand_0327` -> `0.5031005280065836`
@@ -50,18 +50,18 @@ The GitHub repo is the lab dashboard.
 - best stable: `cand_0677` -> audit `0.3845551107118892`
 
 ## Science Trend
-- summary: `Across the last 5 scored candidates, benchmark averaged 0.316184, audit averaged 0.314109, and the mean transfer gap was 0.002076.`
-- recent benchmark avg: `0.31618438562246587`
-- recent audit avg: `0.3141087036175647`
-- recent transfer gap avg: `0.0020756820049011916`
+- summary: `Across the last 5 scored candidates, benchmark averaged 0.349382, audit averaged 0.333331, and the mean transfer gap was 0.016050.`
+- recent benchmark avg: `0.3493817908098776`
+- recent audit avg: `0.3333313650994121`
+- recent transfer gap avg: `0.01605042571046549`
+- `cand_1318`: benchmark `0.4379193912321031`, audit `0.3455301563417119`, gap `0.09238923489039119`
+- `cand_1317`: benchmark `0.3599382462725508`, audit `0.35026081939418335`, gap `0.009677426878367423`
 - `cand_1316`: benchmark `0.3181353039776645`, audit `0.3485255863452627`, gap `-0.03039028236759822`
 - `cand_1315`: benchmark `0.31493273439715996`, audit `0.31190559269063106`, gap `0.003027141706528902`
 - `cand_1314`: benchmark `0.3159832781699095`, audit `0.31043467072527137`, gap `0.005548607444638143`
-- `cand_1313`: benchmark `0.3200544326425396`, audit `0.28818544978504906`, gap `0.03186898285749051`
-- `cand_1312`: benchmark `0.31181617892505586`, audit `0.31149221854160924`, gap `0.0003239603834466198`
 
 ## Hindsight
-- summary: `In the recent scored window, the lab repeated dead-end candidates 4 times; similar proposal shapes should cool down sooner.`
+- summary: `In the recent scored window, the lab repeated dead-end candidates 6 times; similar proposal shapes should cool down sooner.`
 - adjustment: `Increase cooldown penalties for mechanisms with repeated dead_end outcomes.`
 - adjustment: `Raise priority for proposals that directly target transfer stability after an audit_blocked result.`
 
@@ -85,46 +85,46 @@ The GitHub repo is the lab dashboard.
 - command_backend_configured: `True`
 
 ## Backend Science
-- summary: `Recent backend evolution is concentrated in science_backend (1207 candidate(s), avg transfer gap 0.032705).`
+- summary: `Recent backend evolution is concentrated in science_backend (1209 candidate(s), avg transfer gap 0.032736).`
 - recommended_action: `wait`
-- target_module: `science_loss`
-- problem: `Improve transfer-stability evaluation or smoke tests so promising candidates fail earlier before full audit.`
-- why_this_module: `Recent failures are boundary-transfer specific, so the loss surface is the best next bounded module to adjust. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation. Hold off on broad mutation until the post-change sample is less thin. Small conservative lever nudges are still allowed. The last structural change could not be identified, so recent-signal gating is conservative.`
-- secondary_context: `Recent real-backend runs are only using about 604.5 MB on average, leaving most VRAM unused. The last structural change could not be identified, so recent-signal gating is conservative.`
+- target_module: `science_train`
+- problem: `Consider increasing batch size or model capacity so the science backend uses more of the available VRAM.`
+- why_this_module: `The top live pressure is unused VRAM headroom, so favor explicit train-capacity moves first. Start with batch_size and eval_batch_size before drifting back to loss tuning. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation. Hold off on broad mutation until the post-change sample is less thin. Small conservative lever nudges are still allowed. The last structural change could not be identified, so recent-signal gating is conservative.`
+- secondary_context: `Recent real-backend runs are only using about 675.0 MB on average, leaving most VRAM unused. The last structural change could not be identified, so recent-signal gating is conservative.`
 - scored_candidates_since_change: `0`
 - last_structural_commit: `-`
 ### Chosen Lever Values
-- source_candidate: `cand_1315`
-- loss: `instance_loss_weight=0.06, instance_margin=0.35`
+- source_candidate: `cand_1318`
+- train: `batch_size=4, eval_batch_size=3`
 
 ### Effective Backend Settings
-- source_candidate: `cand_1316`
-- model: `hidden_dim=96, global_dim=256, instance_dim=12, k_neighbors=10, instance_modulation_scale=0.05`
-- loss: `param_loss_weight=0.2, boundary_loss_weight=0.15, instance_loss_weight=0.02, instance_margin=0.35`
+- source_candidate: `cand_1318`
+- model: `hidden_dim=128, global_dim=128, instance_dim=16, k_neighbors=6, instance_modulation_scale=0.1`
+- loss: `param_loss_weight=0.2, boundary_loss_weight=0.05, instance_loss_weight=0.05, instance_margin=0.35`
 - eval: `transfer_smoke_min_score=0.24, transfer_smoke_max_gap=0.03, transfer_smoke_min_boundary_f1=0.12`
-- config: `lr=0.0003, weight_decay=0.0001, time_budget_seconds=600, eval_reserve_seconds=120`
-- train: `batch_size=2, eval_batch_size=2, grad_clip=1.0, log_interval=20`
+- config: `lr=0.0004, weight_decay=0.0001, time_budget_seconds=600, eval_reserve_seconds=120`
+- train: `batch_size=4, eval_batch_size=3, grad_clip=1.0, log_interval=20`
 
 ### Modular Levers
-- model: `science_model` (available); attempts `1207`, audit_blocked `523`, avg_gap `0.03270456131118047`
-- loss: `science_loss` (targeted); attempts `1192`, audit_blocked `509`, avg_gap `0.03263215499307077`
-- eval: `science_eval` (available); attempts `1199`, audit_blocked `515`, avg_gap `0.032639181594133766`
-- config: `science_config` (available); attempts `1192`, audit_blocked `509`, avg_gap `0.03263215499307077`
-- train: `science_train` (available); attempts `1185`, audit_blocked `502`, avg_gap `0.032584903984370764`
+- model: `science_model` (available); attempts `1209`, audit_blocked `523`, avg_gap `0.03273567976546434`
+- loss: `science_loss` (available); attempts `1194`, audit_blocked `509`, avg_gap `0.03266377213377749`
+- eval: `science_eval` (available); attempts `1201`, audit_blocked `515`, avg_gap `0.0326706245843735`
+- config: `science_config` (available); attempts `1194`, audit_blocked `509`, avg_gap `0.03266377213377749`
+- train: `science_train` (targeted); attempts `1187`, audit_blocked `502`, avg_gap `0.032616794091371644`
 
 ### Recent Module Evidence
-- `science_backend`: attempts `1207`, audit_blocked `523`, avg_gap `0.03270456131118047`
-- `science_model`: attempts `1207`, audit_blocked `523`, avg_gap `0.03270456131118047`
-- `science_eval`: attempts `1199`, audit_blocked `515`, avg_gap `0.032639181594133766`
-- `science_config`: attempts `1192`, audit_blocked `509`, avg_gap `0.03263215499307077`
+- `science_backend`: attempts `1209`, audit_blocked `523`, avg_gap `0.03273567976546434`
+- `science_model`: attempts `1209`, audit_blocked `523`, avg_gap `0.03273567976546434`
+- `science_eval`: attempts `1201`, audit_blocked `515`, avg_gap `0.0326706245843735`
+- `science_config`: attempts `1194`, audit_blocked `509`, avg_gap `0.03266377213377749`
 
 ### Code Context
 - summary: `Backend code context maps the five modular science seams to their key functions, bounded lever surfaces, fixed implementation surfaces, and likely failure-mode touchpoints.`
-- target_file: `src/harness_lab/science_loss.py`
-- target_purpose: `Combines classification, parameter, boundary, and instance-separation losses into the training objective.`
-- key_functions: `compute_instance_loss, compute_loss`
-- levered_surfaces: `param_loss_weight, boundary_loss_weight, instance_loss_weight, instance_margin`
-- fixed_surfaces: `Cross-entropy plus smooth-L1 plus BCE loss recipe; Instance similarity and same-class negative construction; Loss-term composition order`
+- target_file: `src/harness_lab/science_train.py`
+- target_purpose: `Owns the wall-clock training loop, progress tracing, benchmark/smoke/audit order, and final evidence assembly.`
+- key_functions: `run_training_cycle, write_science_progress, peak_vram_mb`
+- levered_surfaces: `batch_size, eval_batch_size, grad_clip, log_interval`
+- fixed_surfaces: `Time-based training schedule and eval reserve discipline; Benchmark -> smoke -> audit execution order; Evidence and trace writing for science outcomes`
 
 ### Failure-To-Code Hints
 - `boundary_smoke:gap_too_wide` -> `science_eval, science_loss, science_model`: `Boundary smoke regressions often reflect a mix of strict smoke-gap thresholds, weak boundary pressure in the loss, or insufficient boundary-sensitive representation capacity.`
@@ -134,18 +134,18 @@ The GitHub repo is the lab dashboard.
 ### Code Change Brief
 - decision_state: `wait`
 - decision_reason: `Recent evidence may still be too thin or too noisy for broad mutation, but conservative lever nudges are still allowed while more scored candidates accumulate.`
-- target_file: `src/harness_lab/science_loss.py`
-- target_functions: `compute_instance_loss, compute_loss`
-- proposed_change: `Increase transfer-sensitive boundary or instance pressure modestly, for example by strengthening boundary_loss_weight or instance_margin, without changing eval thresholds.`
+- target_file: `src/harness_lab/science_train.py`
+- target_functions: `run_training_cycle, write_science_progress, peak_vram_mb`
+- proposed_change: `Raise bounded train-side capacity, such as batch_size or eval_batch_size, without altering model, loss, or eval semantics.`
 - wait_option: `Recent evidence may still be too thin or too noisy for broad mutation, but conservative lever nudges are still allowed while more scored candidates accumulate.`
 
 ### Code Change Gate
 - summary: `Machine-enforced scope and verification gate for the current code-change brief.`
 - recommended_action: `wait`
-- target_file: `src/harness_lab/science_loss.py`
+- target_file: `src/harness_lab/science_train.py`
 - max_changed_files: `2`
-- allowed_write_files: `src/harness_lab/science_loss.py, tests/test_science_loss.py`
-- focused_tests: `tests/test_science_loss.py`
+- allowed_write_files: `src/harness_lab/science_train.py, tests/test_science_train.py`
+- focused_tests: `tests/test_science_train.py`
 - verification_status: `No verification run recorded yet.`
 
 ### Autonomous Mutation
@@ -166,8 +166,7 @@ The GitHub repo is the lab dashboard.
 - human advice: `No human-facing advice.`
 
 ## What The Lab Wants
-- summary: `The lab has 2 ranked requests for human help.`
-- [12] `evaluation`: `Improve transfer-stability evaluation or smoke tests so promising candidates fail earlier before full audit.`
+- summary: `The lab has 1 ranked requests for human help.`
 - [5] `vram_headroom`: `Consider increasing batch size or model capacity so the science backend uses more of the available VRAM.`
 
 ## What We Did
