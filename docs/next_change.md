@@ -1,26 +1,25 @@
 # Next Change
 
-- summary: Current priority is `module_surface`, but only 0 scored candidate(s) have landed since the last structural change, so broad mutation should wait while conservative lever nudges remain allowed.
+- summary: Current priority is `evaluation`, but only 0 scored candidate(s) have landed since the last structural change, so broad mutation should wait while conservative lever nudges remain allowed.
 - recommended_action: `wait`
 - target_module: `science_loss`
 
 ## Problem
-- Consider exposing `science_train` as a more explicit evolvable backend module if it keeps dominating search.
+- Improve transfer-stability evaluation or smoke tests so promising candidates fail earlier before full audit.
 
 ## Why This Module
 - Recent failures are boundary-transfer specific, so the loss surface is the best next bounded module to adjust. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation. Hold off on broad mutation until the post-change sample is less thin. Small conservative lever nudges are still allowed. The last structural change could not be identified, so recent-signal gating is conservative.
 
 ## Secondary Context
-- Recent real-backend runs are only using about 833.1 MB on average, leaving most VRAM unused. The last structural change could not be identified, so recent-signal gating is conservative.
+- Recent real-backend runs are only using about 784.8 MB on average, leaving most VRAM unused. The last structural change could not be identified, so recent-signal gating is conservative.
 
 ## Options
 - [Option] Mutate science_loss: Recent failures are boundary-transfer specific, so the loss surface is the best next bounded module to adjust. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation. Hold off on broad mutation until the post-change sample is less thin. Small conservative lever nudges are still allowed. The last structural change could not be identified, so recent-signal gating is conservative.
 - [Recommended] Wait on broad mutation: Recent evidence may still be too thin or too noisy for broad mutation, but conservative lever nudges are still allowed while more scored candidates accumulate.
 
 ## Evidence
-- `artifacts/memory/candidate_index.json`
 - `artifacts/memory/hindsight.json`
-- `artifacts/memory/policy.json`
+- `artifacts/memory/science_summary.json`
 - `artifacts/memory/backend_module_summary.json`
 
 ## Guardrails
