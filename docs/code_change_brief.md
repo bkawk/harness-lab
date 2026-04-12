@@ -1,49 +1,50 @@
 # Code Change Brief
 
-- summary: Current priority is `module_surface`, but only 0 scored candidate(s) have landed since the last structural change, so broad mutation should wait while conservative lever nudges remain allowed.
+- summary: Current priority is `vram_headroom`, but only 0 scored candidate(s) have landed since the last structural change, so broad mutation should wait while conservative lever nudges remain allowed.
 - recommended_action: `wait`
-- target_module: `science_loss`
-- target_file: `src/harness_lab/science_loss.py`
+- target_module: `science_train`
+- target_file: `src/harness_lab/science_train.py`
 
 ## Target Functions
-- `compute_instance_loss`
-- `compute_loss`
+- `run_training_cycle`
+- `write_science_progress`
+- `peak_vram_mb`
 
 ## Problem
-- Consider exposing `science_train` as a more explicit evolvable backend module if it keeps dominating search.
+- Consider increasing batch size or model capacity so the science backend uses more of the available VRAM.
 
 ## Why This Module
-- Recent failures are boundary-transfer specific, so the loss surface is the best next bounded module to adjust. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation. Hold off on broad mutation until the post-change sample is less thin. Small conservative lever nudges are still allowed. The last structural change could not be identified, so recent-signal gating is conservative.
+- The top live pressure is unused VRAM headroom, so favor explicit train-capacity moves first. Start with batch_size and eval_batch_size before drifting back to loss tuning. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation. Hold off on broad mutation until the post-change sample is less thin. Small conservative lever nudges are still allowed. The last structural change could not be identified, so recent-signal gating is conservative.
 
 ## Code Hypothesis
-- The current transfer problem is more likely to improve through stronger transfer-sensitive loss pressure than through changing evaluation thresholds alone.
+- The current opportunity is more likely to improve through train-side capacity use than through loss or eval changes first.
 
 ## Decision State
 - `wait`
 - Recent evidence may still be too thin or too noisy for broad mutation, but conservative lever nudges are still allowed while more scored candidates accumulate.
 
 ## Proposed Change
-- Increase transfer-sensitive boundary or instance pressure modestly, for example by strengthening boundary_loss_weight or instance_margin, without changing eval thresholds.
+- Raise bounded train-side capacity, such as batch_size or eval_batch_size, without altering model, loss, or eval semantics.
 
 ## Execution Contract
 - Add, remove, or refactor code within the target module when that is the smallest clean way to express the bounded change.
 - Add or update adjacent focused tests that directly cover the target module change.
 
 ## Scope Limits
-- Keep the write scope to `science_loss` plus adjacent focused tests unless the brief explicitly names another seam.
+- Keep the write scope to `science_train` plus adjacent focused tests unless the brief explicitly names another seam.
 - Do not turn a bounded module change into a multi-module refactor in the same patch.
 
 ## Do Not Change
-- Do not change science_eval thresholds in the same patch.
-- Do not broaden into model architecture rewrites or dataset changes.
-- Do not rewrite these fixed surfaces in the same patch: Cross-entropy plus smooth-L1 plus BCE loss recipe; Instance similarity and same-class negative construction; Loss-term composition order.
+- Do not change science_eval or loss semantics in the same patch.
+- Do not remove progress, metrics, or backend result traces.
+- Do not rewrite these fixed surfaces in the same patch: Time-based training schedule and eval reserve discipline; Benchmark -> smoke -> audit execution order; Evidence and trace writing for science outcomes.
 
 ## Acceptance Checks
-- The loss change remains bounded to transfer-sensitive pressure and does not silently rewrite evaluation logic.
-- The next real candidate should produce clearer transfer behavior without breaking trace emission or outcome writing.
+- The train change should visibly alter effective batch/log settings without breaking wall-clock reserve discipline.
+- The next candidate should still write progress and result artifacts through the normal command backend.
 
 ## Focused Tests
-- `tests/test_science_loss.py`
+- `tests/test_science_train.py`
 
 ## Verification
 - Run focused tests for the target module and adjacent seams.
@@ -64,12 +65,11 @@
 - Wait on broad mutation: Recent evidence may still be too thin or too noisy for broad mutation, but conservative lever nudges are still allowed while more scored candidates accumulate.
 
 ## Evidence
-- `artifacts/memory/candidate_index.json`
-- `artifacts/memory/hindsight.json`
-- `artifacts/memory/policy.json`
+- `artifacts/memory/science_debug_summary.json`
+- `artifacts/memory/hardware_profile.json`
 - `artifacts/memory/backend_module_summary.json`
-- `src/harness_lab/science_loss.py`
-- `failure_to_code:boundary_smoke:gap_too_wide`
+- `src/harness_lab/science_train.py`
+- `failure_to_code:vram_headroom`
 
 ## Note
 - This brief is generated for review only. It should sharpen code-change planning, not authorize autonomous code edits.
