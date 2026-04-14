@@ -11,7 +11,7 @@
 - Recent failures are dominated by smoke-gate transfer checks, so the evaluation module is the best next bounded target. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation. Hold off on broad mutation until the post-change sample is less thin. Small conservative lever nudges are still allowed. The last structural change could not be identified, so recent-signal gating is conservative.
 
 ## Secondary Context
-- Recent real-backend runs are only using about 611.4 MB on average, leaving most VRAM unused. The last structural change could not be identified, so recent-signal gating is conservative.
+- Recent real-backend runs are only using about 602.0 MB on average, leaving most VRAM unused. The last structural change could not be identified, so recent-signal gating is conservative.
 
 ## Options
 - [Option] Mutate science_eval: Recent failures are dominated by smoke-gate transfer checks, so the evaluation module is the best next bounded target. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation. Hold off on broad mutation until the post-change sample is less thin. Small conservative lever nudges are still allowed. The last structural change could not be identified, so recent-signal gating is conservative.
