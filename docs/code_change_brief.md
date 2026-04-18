@@ -2,48 +2,50 @@
 
 - summary: Current priority is `evaluation`, but only 0 scored candidate(s) have landed since the last structural change, so broad mutation should wait while conservative lever nudges remain allowed.
 - recommended_action: `wait`
-- target_module: `science_loss`
-- target_file: `src/harness_lab/science_loss.py`
+- target_module: `science_model`
+- target_file: `src/harness_lab/science_model.py`
 
 ## Target Functions
-- `compute_instance_loss`
-- `compute_loss`
+- `CompactPointModel.__init__`
+- `CompactPointModel.forward`
+- `knn_indices`
+- `gather_neighbors`
 
 ## Problem
 - Improve transfer-stability evaluation or smoke tests so promising candidates fail earlier before full audit.
 
 ## Why This Module
-- Recent failures are boundary-transfer specific, so the loss surface is the best next bounded module to adjust. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation. Hold off on broad mutation until the post-change sample is less thin. Small conservative lever nudges are still allowed. The last structural change could not be identified, so recent-signal gating is conservative.
+- Recent failures point to transfer behavior that likely depends on model capacity and representation quality. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation. Hold off on broad mutation until the post-change sample is less thin. Small conservative lever nudges are still allowed. The last structural change could not be identified, so recent-signal gating is conservative.
 
 ## Code Hypothesis
-- The current transfer problem is more likely to improve through stronger transfer-sensitive loss pressure than through changing evaluation thresholds alone.
+- The current transfer problem is more likely to improve through representation-capacity or local-context changes than through threshold-only evaluation changes.
 
 ## Decision State
 - `wait`
 - Recent evidence may still be too thin or too noisy for broad mutation, but conservative lever nudges are still allowed while more scored candidates accumulate.
 
 ## Proposed Change
-- Increase transfer-sensitive boundary or instance pressure modestly, for example by strengthening boundary_loss_weight or instance_margin, without changing eval thresholds.
+- Increase or rebalance representation capacity in a narrow way, such as local-context width or neighborhood strength, without touching smoke thresholds or runner behavior.
 
 ## Execution Contract
 - Add, remove, or refactor code within the target module when that is the smallest clean way to express the bounded change.
 - Add or update adjacent focused tests that directly cover the target module change.
 
 ## Scope Limits
-- Keep the write scope to `science_loss` plus adjacent focused tests unless the brief explicitly names another seam.
+- Keep the write scope to `science_model` plus adjacent focused tests unless the brief explicitly names another seam.
 - Do not turn a bounded module change into a multi-module refactor in the same patch.
 
 ## Do Not Change
-- Do not change science_eval thresholds in the same patch.
-- Do not broaden into model architecture rewrites or dataset changes.
-- Do not rewrite these fixed surfaces in the same patch: Cross-entropy plus smooth-L1 plus BCE loss recipe; Instance similarity and same-class negative construction; Loss-term composition order.
+- Do not change science_eval smoke thresholds in the same patch.
+- Do not alter runner wall-clock or fallback behavior.
+- Do not rewrite these fixed surfaces in the same patch: Point encoder and classifier topology; Fusion layout combining point, local, and global features; Instance pathway structure and normalization.
 
 ## Acceptance Checks
-- The loss change remains bounded to transfer-sensitive pressure and does not silently rewrite evaluation logic.
-- The next real candidate should produce clearer transfer behavior without breaking trace emission or outcome writing.
+- The target module still produces real science traces and completes benchmark/smoke/audit in the normal backend path.
+- The change remains bounded to model-capacity or local-context behavior rather than broad training-policy changes.
 
 ## Focused Tests
-- `tests/test_science_loss.py`
+- `tests/test_science_model.py`
 
 ## Verification
 - Run focused tests for the target module and adjacent seams.
@@ -67,7 +69,7 @@
 - `artifacts/memory/hindsight.json`
 - `artifacts/memory/science_summary.json`
 - `artifacts/memory/backend_module_summary.json`
-- `src/harness_lab/science_loss.py`
+- `src/harness_lab/science_model.py`
 - `failure_to_code:boundary_smoke:gap_too_wide`
 
 ## Note
