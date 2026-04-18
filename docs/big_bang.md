@@ -6,18 +6,18 @@ The GitHub repo is the lab dashboard.
 - status: `running`
 - vital_spark_at: `2026-03-31T10:12:12+00:00`
 - started_at: `2026-04-02T20:24:39+00:00`
-- last_heartbeat: `2026-04-18T11:52:50+00:00`
-- cycles_completed: `2016`
+- last_heartbeat: `2026-04-18T12:14:47+00:00`
+- cycles_completed: `2018`
 - genesis seed: `cand_0001`
-- last candidate: `cand_2440`
+- last candidate: `cand_2442`
 - last dataset: `abc_boundary512`
 - last commit: `-`
 - last publish message: `Publishing skipped.`
 - last cycle mode: `normal_cycle`
-- novelty cycles triggered: `332`
+- novelty cycles triggered: `333`
 
 ## Latest Step
-- candidate: `cand_2440`
+- candidate: `cand_2442`
 - dataset: `abc_boundary512` via `reused_prepared_dataset`
 - seed action: `existing`
 - proposal status: `candidate`
@@ -29,19 +29,19 @@ The GitHub repo is the lab dashboard.
 - cycle mode: `normal_cycle`
 
 ## Active Backend
-- active_candidate: `cand_2440`
+- active_candidate: `cand_2442`
 - backend_status: `finished`
-- backend_pid: `3113960`
-- backend_started_at: `2026-04-18T11:42:44+00:00`
-- backend_last_poll_at: `2026-04-18T11:52:47+00:00`
+- backend_pid: `3114329`
+- backend_started_at: `2026-04-18T12:04:42+00:00`
+- backend_last_poll_at: `2026-04-18T12:14:44+00:00`
 - backend_poll_interval_seconds: `1.0`
 
 ## Recent Candidates
+- `cand_2442`: outcome `audit_blocked`; diagnosis `complete`; benchmark `0.34802949006409123`
+- `cand_2441`: outcome `audit_blocked`; diagnosis `complete`; benchmark `0.29401205989618323`
 - `cand_2440`: outcome `audit_blocked`; diagnosis `complete`; benchmark `0.33204212124937527`
 - `cand_2439`: outcome `audit_blocked`; diagnosis `complete`; benchmark `0.2991487105992279`
 - `cand_2438`: outcome `audit_blocked`; diagnosis `complete`; benchmark `0.34282572697564623`
-- `cand_2437`: outcome `improved`; diagnosis `complete`; benchmark `0.29533604366413996`
-- `cand_2436`: outcome `dead_end`; diagnosis `complete`; benchmark `0.39747714044236127`
 
 ## Science Leaders
 - best benchmark: `cand_0327` -> `0.5031005280065836`
@@ -50,15 +50,15 @@ The GitHub repo is the lab dashboard.
 - best stable: `cand_1857` -> audit `0.3982083419591221`
 
 ## Science Trend
-- summary: `Across the last 5 scored candidates, benchmark averaged 0.333366, audit averaged 0.303729, and the mean transfer gap was 0.029637.`
-- recent benchmark avg: `0.3333659485861501`
-- recent audit avg: `0.3037288709212903`
-- recent transfer gap avg: `0.029637077664859856`
+- summary: `Across the last 5 scored candidates, benchmark averaged 0.323212, audit averaged 0.291487, and the mean transfer gap was 0.031725.`
+- recent benchmark avg: `0.32321162175690477`
+- recent audit avg: `0.29148701117339343`
+- recent transfer gap avg: `0.03172461058351136`
+- `cand_2442`: benchmark `0.34802949006409123`, audit `0.31212672428938315`, gap `0.03590276577470808`
+- `cand_2441`: benchmark `0.29401205989618323`, audit `0.2432263067236311`, gap `0.05078575317255213`
 - `cand_2440`: benchmark `0.33204212124937527`, audit `0.37748697517426943`, gap `-0.04544485392489417`
 - `cand_2439`: benchmark `0.2991487105992279`, audit `0.30499423912191914`, gap `-0.005845528522691268`
 - `cand_2438`: benchmark `0.34282572697564623`, audit `0.2196008105577642`, gap `0.12322491641788202`
-- `cand_2437`: benchmark `0.29533604366413996`, audit `0.3162738969289789`, gap `-0.020937853264838935`
-- `cand_2436`: benchmark `0.39747714044236127`, audit `0.30028843282351964`, gap `0.09718870761884163`
 
 ## Hindsight
 - summary: `In the recent scored window, the lab repeated dead-end candidates 2 times; similar proposal shapes should cool down sooner.`
@@ -70,8 +70,8 @@ The GitHub repo is the lab dashboard.
 - selection_mode: `stabilize`
 - cooldown_multiplier: `2.0`
 - preferred_runner_backend: `command`
-- publish_every_cycles: `1`
-- novelty_cycle_priority: `high`
+- publish_every_cycles: `2`
+- novelty_cycle_priority: `normal`
 
 ## Budget
 - summary: `Mechanisms science_loss, science_train, science_model exhausted their follow-up budget; broaden the search.`
@@ -85,7 +85,7 @@ The GitHub repo is the lab dashboard.
 - command_backend_configured: `True`
 
 ## Backend Science
-- summary: `Recent backend evolution is concentrated in science_backend (2331 candidate(s), avg transfer gap 0.032114).`
+- summary: `Recent backend evolution is concentrated in science_backend (2333 candidate(s), avg transfer gap 0.032124).`
 - recommended_action: `wait`
 - target_module: `science_loss`
 - problem: `Improve transfer-stability evaluation or smoke tests so promising candidates fail earlier before full audit.`
@@ -94,29 +94,29 @@ The GitHub repo is the lab dashboard.
 - scored_candidates_since_change: `0`
 - last_structural_commit: `-`
 ### Chosen Lever Values
-- source_candidate: `cand_2440`
-- loss: `boundary_loss_weight=0.1, instance_margin=0.38`
+- source_candidate: `cand_2442`
+- loss: `boundary_loss_weight=0.12, instance_margin=0.38`
 
 ### Effective Backend Settings
-- source_candidate: `cand_2440`
+- source_candidate: `cand_2442`
 - model: `hidden_dim=128, global_dim=128, instance_dim=16, k_neighbors=8, instance_modulation_scale=0.1`
-- loss: `param_loss_weight=0.2, boundary_loss_weight=0.1, instance_loss_weight=0.06, instance_margin=0.38`
+- loss: `param_loss_weight=0.2, boundary_loss_weight=0.12, instance_loss_weight=0.06, instance_margin=0.38`
 - eval: `transfer_smoke_min_score=0.24, transfer_smoke_max_gap=0.03, transfer_smoke_min_boundary_f1=0.12`
 - config: `lr=0.00025, weight_decay=0.0002, time_budget_seconds=600, eval_reserve_seconds=120`
 - train: `batch_size=2, eval_batch_size=2, grad_clip=1.0, log_interval=20`
 
 ### Modular Levers
-- model: `science_model` (available); attempts `2331`, audit_blocked `986`, avg_gap `0.032114015763408284`
-- loss: `science_loss` (targeted); attempts `2316`, audit_blocked `972`, avg_gap `0.03207359416265925`
-- eval: `science_eval` (available); attempts `2323`, audit_blocked `978`, avg_gap `0.03207863710987742`
-- config: `science_config` (available); attempts `2316`, audit_blocked `972`, avg_gap `0.03207359416265925`
-- train: `science_train` (available); attempts `2309`, audit_blocked `965`, avg_gap `0.03204793166118431`
+- model: `science_model` (available); attempts `2333`, audit_blocked `988`, avg_gap `0.032123772708421504`
+- loss: `science_loss` (targeted); attempts `2318`, audit_blocked `974`, avg_gap `0.03208344614282618`
+- eval: `science_eval` (available); attempts `2325`, audit_blocked `980`, avg_gap `0.032088458925364556`
+- config: `science_config` (available); attempts `2318`, audit_blocked `974`, avg_gap `0.03208344614282618`
+- train: `science_train` (available); attempts `2311`, audit_blocked `967`, avg_gap `0.03205783637649553`
 
 ### Recent Module Evidence
-- `science_backend`: attempts `2331`, audit_blocked `986`, avg_gap `0.032114015763408284`
-- `science_model`: attempts `2331`, audit_blocked `986`, avg_gap `0.032114015763408284`
-- `science_eval`: attempts `2323`, audit_blocked `978`, avg_gap `0.03207863710987742`
-- `science_config`: attempts `2316`, audit_blocked `972`, avg_gap `0.03207359416265925`
+- `science_backend`: attempts `2333`, audit_blocked `988`, avg_gap `0.032123772708421504`
+- `science_model`: attempts `2333`, audit_blocked `988`, avg_gap `0.032123772708421504`
+- `science_eval`: attempts `2325`, audit_blocked `980`, avg_gap `0.032088458925364556`
+- `science_config`: attempts `2318`, audit_blocked `974`, avg_gap `0.03208344614282618`
 
 ### Code Context
 - summary: `Backend code context maps the five modular science seams to their key functions, bounded lever surfaces, fixed implementation surfaces, and likely failure-mode touchpoints.`
@@ -176,6 +176,6 @@ The GitHub repo is the lab dashboard.
 - no recent human responses recorded yet
 
 ## Diversity
-- summary: `The lab has stayed on `science_loss` for 3 recent candidates; inject a novelty step.`
-- current_mechanism_streak: `3`
-- novelty_step_recommended: `True`
+- summary: `Recent branching still has room, but `science_loss` is the current active line.`
+- current_mechanism_streak: `1`
+- novelty_step_recommended: `False`
