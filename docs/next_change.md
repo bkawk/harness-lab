@@ -11,7 +11,7 @@
 - Recent failures are boundary-transfer specific, so the loss surface is the best next bounded module to adjust. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation. Hold off on broad mutation until the post-change sample is less thin. Small conservative lever nudges are still allowed. The last structural change could not be identified, so recent-signal gating is conservative.
 
 ## Secondary Context
-- Recent real-backend runs are only using about 744.6 MB on average, leaving most VRAM unused. The last structural change could not be identified, so recent-signal gating is conservative.
+- Recent real-backend runs are only using about 746.6 MB on average, leaving most VRAM unused. The last structural change could not be identified, so recent-signal gating is conservative.
 
 ## Options
 - [Option] Mutate science_loss: Recent failures are boundary-transfer specific, so the loss surface is the best next bounded module to adjust. Secondary signal: VRAM headroom is present, but it is not the main reason for this recommendation. Hold off on broad mutation until the post-change sample is less thin. Small conservative lever nudges are still allowed. The last structural change could not be identified, so recent-signal gating is conservative.
